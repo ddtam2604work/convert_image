@@ -11,9 +11,9 @@
   --border-light: #E7DFD4;    /* Subtle soft border */
   --border-accent: #8C6849;   /* Warm Mocha */
   
-  --text-main: #23201E;       /* Deep warm charcoal */
-  --text-muted: #796F65;      /* Muted mocha brown */
-  --text-faint: #A69B8F;      /* Faint sand */
+  --text-main: #14100D;       /* Deep rich espresso / near-black */
+  --text-muted: #382E25;      /* Strong dark mocha brown (high contrast) */
+  --text-faint: #4D3F32;      /* Clear readable secondary text */
   
   --accent-mocha: #8C6849;    /* Primary Mocha Brown */
   --accent-mocha-hover: #755539;

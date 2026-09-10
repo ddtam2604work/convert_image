@@ -54,13 +54,13 @@ BORDER_DARK    = "#484039"       # Warm dark border
 BORDER_LIGHT   = "#e3d8c8"       # Soft cream border
 BORDER_ACCENT  = "#8c6849"       # Warm mocha
 
-# Typography
+# Typography — High contrast & ultra legible for Light & Dark modes
 TEXT_PRIMARY_D = "#fcfaf7"       # Warm ivory
-TEXT_PRIMARY_L = "#26201b"       # Deep espresso
-TEXT_MUTED_D   = "#b5aba0"       # Muted warm gray
-TEXT_MUTED_L   = "#7c6f63"       # Muted mocha brown
-TEXT_FAINT_D   = "#857a6f"
-TEXT_FAINT_L   = "#a89c8f"
+TEXT_PRIMARY_L = "#14100d"       # Deep rich espresso / near-black for maximum crispness
+TEXT_MUTED_D   = "#c7beb3"       # Muted warm gray
+TEXT_MUTED_L   = "#382e25"       # Strong dark mocha brown (high contrast, ultra legible)
+TEXT_FAINT_D   = "#9e9286"       # Subdued text dark
+TEXT_FAINT_L   = "#4d3f32"       # Subdued text light (clear and readable)
 
 # Semantic Brand Accents
 ACCENT         = "#8c6849"       # Warm Mocha Brown (Brand)
@@ -72,6 +72,76 @@ WARNING        = "#b87d4b"       # Warm Ochre / Terracotta
 WARNING_HOVER  = "#9d683b"
 DANGER         = "#ba4d4d"       # Muted Terracotta Red
 DANGER_HOVER   = "#a03d3d"
+
+# ─── HIGH CONTRAST WIDGET CONTRAST ENHANCEMENTS ─────────────────────────────
+# Automatically ensure high contrast text colors for Segmented Buttons,
+# Option Menus, Tabviews, Checkboxes, Switches, and Entries.
+
+_orig_sb_init = ctk.CTkSegmentedButton.__init__
+_orig_sb_select = ctk.CTkSegmentedButton._select_button_by_value
+_orig_sb_unselect = ctk.CTkSegmentedButton._unselect_button_by_value
+
+def _patched_sb_init(self, *args, **kwargs):
+    if "text_color" not in kwargs or kwargs["text_color"] is None:
+        kwargs["text_color"] = (TEXT_PRIMARY_L, TEXT_PRIMARY_D)
+    _orig_sb_init(self, *args, **kwargs)
+
+def _patched_sb_select(self, value: str):
+    _orig_sb_select(self, value)
+    if value in self._buttons_dict:
+        self._buttons_dict[value].configure(text_color=("white", "white"))
+
+def _patched_sb_unselect(self, value: str):
+    _orig_sb_unselect(self, value)
+    if value in self._buttons_dict:
+        self._buttons_dict[value].configure(text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D))
+
+ctk.CTkSegmentedButton.__init__ = _patched_sb_init
+ctk.CTkSegmentedButton._select_button_by_value = _patched_sb_select
+ctk.CTkSegmentedButton._unselect_button_by_value = _patched_sb_unselect
+
+_orig_om_init = ctk.CTkOptionMenu.__init__
+def _patched_om_init(self, *args, **kwargs):
+    if "text_color" not in kwargs or kwargs["text_color"] is None:
+        kwargs["text_color"] = (TEXT_PRIMARY_L, TEXT_PRIMARY_D)
+    if "dropdown_text_color" not in kwargs or kwargs["dropdown_text_color"] is None:
+        kwargs["dropdown_text_color"] = (TEXT_PRIMARY_L, TEXT_PRIMARY_D)
+    if "dropdown_fg_color" not in kwargs or kwargs["dropdown_fg_color"] is None:
+        kwargs["dropdown_fg_color"] = (BG_PANEL_LIGHT, BG_PANEL_DARK)
+    if "dropdown_hover_color" not in kwargs or kwargs["dropdown_hover_color"] is None:
+        kwargs["dropdown_hover_color"] = (BG_SUB_LIGHT, BG_SUB_DARK)
+    _orig_om_init(self, *args, **kwargs)
+ctk.CTkOptionMenu.__init__ = _patched_om_init
+
+_orig_tv_init = ctk.CTkTabview.__init__
+def _patched_tv_init(self, *args, **kwargs):
+    if "text_color" not in kwargs or kwargs["text_color"] is None:
+        kwargs["text_color"] = (TEXT_PRIMARY_L, TEXT_PRIMARY_D)
+    _orig_tv_init(self, *args, **kwargs)
+ctk.CTkTabview.__init__ = _patched_tv_init
+
+_orig_cb_init = ctk.CTkCheckBox.__init__
+def _patched_cb_init(self, *args, **kwargs):
+    if "text_color" not in kwargs or kwargs["text_color"] is None:
+        kwargs["text_color"] = (TEXT_PRIMARY_L, TEXT_PRIMARY_D)
+    _orig_cb_init(self, *args, **kwargs)
+ctk.CTkCheckBox.__init__ = _patched_cb_init
+
+_orig_sw_init = ctk.CTkSwitch.__init__
+def _patched_sw_init(self, *args, **kwargs):
+    if "text_color" not in kwargs or kwargs["text_color"] is None:
+        kwargs["text_color"] = (TEXT_PRIMARY_L, TEXT_PRIMARY_D)
+    _orig_sw_init(self, *args, **kwargs)
+ctk.CTkSwitch.__init__ = _patched_sw_init
+
+_orig_entry_init = ctk.CTkEntry.__init__
+def _patched_entry_init(self, *args, **kwargs):
+    if "text_color" not in kwargs or kwargs["text_color"] is None:
+        kwargs["text_color"] = (TEXT_PRIMARY_L, TEXT_PRIMARY_D)
+    if "placeholder_text_color" not in kwargs or kwargs["placeholder_text_color"] is None:
+        kwargs["placeholder_text_color"] = (TEXT_MUTED_L, TEXT_MUTED_D)
+    _orig_entry_init(self, *args, **kwargs)
+ctk.CTkEntry.__init__ = _patched_entry_init
 
 # ─── PRESET CONFIGURATIONS ───────────────────────────────────────────────────
 PRESETS = {
@@ -236,8 +306,8 @@ class OmniImageStudioApp(ctk.CTk):
 
         sub_label = ctk.CTkLabel(
             title_box, text="D E S I G N   W I T H   E M P A T H Y",
-            font=ctk.CTkFont("Segoe UI", 8, "bold"),
-            text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
+            font=ctk.CTkFont("Segoe UI", 9, "bold"),
+            text_color=ACCENT
         )
         sub_label.pack(anchor="w", pady=(0, 1))
 
@@ -264,8 +334,8 @@ class OmniImageStudioApp(ctk.CTk):
         self.lbl_file_count = ctk.CTkLabel(
             right_box,
             text="Chưa có ảnh",
-            font=ctk.CTkFont("Segoe UI", 11),
-            text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
         )
         self.lbl_file_count.pack(side="left", padx=(0, 16))
 
@@ -403,16 +473,17 @@ class OmniImageStudioApp(ctk.CTk):
 
         ctk.CTkLabel(
             sub_row, text="Định dạng khác:",
-            font=ctk.CTkFont("Segoe UI", 11),
-            text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
         ).grid(row=0, column=0, padx=(0, 8), sticky="w")
 
         self.extra_format_menu = ctk.CTkOptionMenu(
             sub_row,
             values=["── Chọn khác ──", "BMP", "GIF", "TIFF"],
             height=26, corner_radius=6,
-            font=ctk.CTkFont("Segoe UI", 11),
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
             fg_color=(BG_SUB_LIGHT, BG_SUB_DARK),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
             button_color=ACCENT, button_hover_color=ACCENT_HOVER,
             command=self._on_extra_format
         )
@@ -430,8 +501,8 @@ class OmniImageStudioApp(ctk.CTk):
 
         ctk.CTkLabel(
             qual_hdr, text="Chất lượng ảnh xuất",
-            font=ctk.CTkFont("Segoe UI", 11),
-            text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
         ).grid(row=0, column=0, sticky="w")
 
         self.lbl_quality = ctk.CTkLabel(
@@ -468,8 +539,9 @@ class OmniImageStudioApp(ctk.CTk):
             values=list(PRESETS.keys()),
             command=self._on_preset_selected,
             height=30, corner_radius=6,
-            font=ctk.CTkFont("Segoe UI", 11),
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
             fg_color=(BG_SUB_LIGHT, BG_SUB_DARK),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
             button_color=ACCENT, button_hover_color=ACCENT_HOVER,
         )
         self.preset_menu.set("── Chọn kích thước mẫu ──")
@@ -484,7 +556,7 @@ class OmniImageStudioApp(ctk.CTk):
         self.entry_w = ctk.CTkEntry(
             dim_row, placeholder_text="Rộng (px)",
             height=32, corner_radius=6,
-            font=ctk.CTkFont("Segoe UI", 12),
+            font=ctk.CTkFont("Segoe UI", 12, "bold"),
             border_color=(BORDER_LIGHT, BORDER_DARK)
         )
         self.entry_w.grid(row=0, column=0, sticky="ew")
@@ -493,13 +565,13 @@ class OmniImageStudioApp(ctk.CTk):
         ctk.CTkLabel(
             dim_row, text="×",
             font=ctk.CTkFont("Segoe UI", 15, "bold"),
-            text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
         ).grid(row=0, column=1, padx=6)
 
         self.entry_h = ctk.CTkEntry(
             dim_row, placeholder_text="Cao (px)",
             height=32, corner_radius=6,
-            font=ctk.CTkFont("Segoe UI", 12),
+            font=ctk.CTkFont("Segoe UI", 12, "bold"),
             border_color=(BORDER_LIGHT, BORDER_DARK)
         )
         self.entry_h.grid(row=0, column=2, sticky="ew")
@@ -510,9 +582,10 @@ class OmniImageStudioApp(ctk.CTk):
         self.chk_lock = ctk.CTkCheckBox(
             card, text="🔗  Khóa tỉ lệ khung hình",
             variable=self.lock_aspect_var,
-            font=ctk.CTkFont("Segoe UI", 11),
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
             checkmark_color="white",
             fg_color=ACCENT, hover_color=ACCENT_HOVER,
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
         )
         self.chk_lock.grid(row=2, column=0, padx=10, pady=(4, 6), sticky="w")
 
@@ -523,16 +596,17 @@ class OmniImageStudioApp(ctk.CTk):
 
         ctk.CTkLabel(
             fit_box, text="Chế độ vừa khung:",
-            font=ctk.CTkFont("Segoe UI", 11),
-            text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
         ).grid(row=0, column=0, padx=(0, 6), sticky="w")
 
         self.fit_mode_menu = ctk.CTkOptionMenu(
             fit_box,
             values=["Kéo dãn (stretch)", "Vừa khung (contain)", "Lấp đầy (cover)"],
             height=26, corner_radius=6,
-            font=ctk.CTkFont("Segoe UI", 11),
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
             fg_color=(BG_SUB_LIGHT, BG_SUB_DARK),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
             button_color=ACCENT, button_hover_color=ACCENT_HOVER,
             command=lambda v: self.schedule_live_preview()
         )
@@ -583,8 +657,8 @@ class OmniImageStudioApp(ctk.CTk):
 
         ctk.CTkLabel(
             bg_sub, text="Phông nền:",
-            font=ctk.CTkFont("Segoe UI", 11),
-            text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
         ).grid(row=0, column=0, padx=(0, 6), sticky="w")
 
         self.canva_bg_segmented = ctk.CTkSegmentedButton(
@@ -593,6 +667,7 @@ class OmniImageStudioApp(ctk.CTk):
             font=ctk.CTkFont("Segoe UI", 10, "bold"),
             selected_color=ACCENT, selected_hover_color=ACCENT_HOVER,
             unselected_color=(BG_SUB_LIGHT, BG_SUB_DARK),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
             command=self._on_canva_bg_preset
         )
         self.canva_bg_segmented.set("Trong suốt")
@@ -607,9 +682,10 @@ class OmniImageStudioApp(ctk.CTk):
         self.chk_shadow = ctk.CTkCheckBox(
             effects_box, text="Đổ bóng (Shadow)",
             variable=self.canva_shadow_enabled,
-            font=ctk.CTkFont("Segoe UI", 11),
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
             checkmark_color="white",
             fg_color=ACCENT, hover_color=ACCENT_HOVER,
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
             command=self.schedule_live_preview
         )
         self.chk_shadow.grid(row=0, column=0, sticky="w", pady=2)
@@ -617,9 +693,10 @@ class OmniImageStudioApp(ctk.CTk):
         self.chk_glow = ctk.CTkCheckBox(
             effects_box, text="Viền nét (Outline)",
             variable=self.canva_glow_enabled,
-            font=ctk.CTkFont("Segoe UI", 11),
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
             checkmark_color="white",
             fg_color=ACCENT, hover_color=ACCENT_HOVER,
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
             command=self.schedule_live_preview
         )
         self.chk_glow.grid(row=0, column=1, sticky="w", pady=2)
@@ -635,8 +712,8 @@ class OmniImageStudioApp(ctk.CTk):
 
         ctk.CTkLabel(
             tol_hdr, text="Độ nhạy tách nền",
-            font=ctk.CTkFont("Segoe UI", 11),
-            text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
         ).grid(row=0, column=0, sticky="w")
 
         self.lbl_tolerance = ctk.CTkLabel(
@@ -666,8 +743,8 @@ class OmniImageStudioApp(ctk.CTk):
 
         ctk.CTkLabel(
             sharp_hdr, text="Tăng độ nét Unsharp Mask",
-            font=ctk.CTkFont("Segoe UI", 11),
-            text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
         ).grid(row=0, column=0, sticky="w")
 
         self.lbl_sharpen = ctk.CTkLabel(
@@ -706,7 +783,7 @@ class OmniImageStudioApp(ctk.CTk):
             fg_color=(BG_SUB_LIGHT, BG_SUB_DARK),
             hover_color=(BORDER_LIGHT, BORDER_DARK),
             text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
-            font=ctk.CTkFont("Segoe UI", 11),
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
             command=self.select_hidden_logo
         )
         self.btn_select_logo.grid(row=0, column=0, padx=(8, 4), pady=(8, 4), sticky="ew")
@@ -723,8 +800,8 @@ class OmniImageStudioApp(ctk.CTk):
         self.lbl_logo_info = ctk.CTkLabel(
             card,
             text="Chưa chọn logo nhúng",
-            font=ctk.CTkFont("Segoe UI", 10),
-            text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
+            font=ctk.CTkFont("Segoe UI", 10, "bold"),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
         )
         self.lbl_logo_info.grid(row=1, column=0, columnspan=2, padx=8, pady=(0, 4), sticky="w")
 
@@ -750,7 +827,7 @@ class OmniImageStudioApp(ctk.CTk):
             fg_color=(BG_SUB_LIGHT, BG_SUB_DARK),
             hover_color=(BORDER_LIGHT, BORDER_DARK),
             text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
-            font=ctk.CTkFont("Segoe UI", 11),
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
             command=self.quick_sanitize_current_image
         )
         self.btn_sanitize_lsb.grid(row=3, column=1, padx=(4, 8), pady=(4, 4), sticky="ew")
@@ -760,9 +837,10 @@ class OmniImageStudioApp(ctk.CTk):
             card,
             text="🧹  Làm sạch logo ẩn khi xuất",
             variable=self.var_clean_stego,
-            font=ctk.CTkFont("Segoe UI", 10),
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
             checkmark_color="white",
             fg_color=ACCENT, hover_color=ACCENT_HOVER,
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
         )
         self.chk_clean_stego.grid(row=4, column=0, columnspan=2, padx=10, pady=(4, 8), sticky="w")
 
@@ -783,6 +861,7 @@ class OmniImageStudioApp(ctk.CTk):
             segmented_button_selected_color=ACCENT,
             segmented_button_selected_hover_color=ACCENT_HOVER,
             segmented_button_unselected_color=(BG_SUB_LIGHT, BG_SUB_DARK),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
             corner_radius=10,
         )
         self.tabview.grid(row=0, column=0, sticky="nsew", padx=12, pady=(10, 6))
@@ -806,8 +885,8 @@ class OmniImageStudioApp(ctk.CTk):
         self.status_label = ctk.CTkLabel(
             status_bar,
             text="Sẵn sàng  •  Kéo thả ảnh vào khung hoặc bấm 'Chọn File Ảnh' để bắt đầu",
-            font=ctk.CTkFont("Segoe UI", 11),
-            text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
         )
         self.status_label.grid(row=0, column=0, padx=14, sticky="w")
 
@@ -890,7 +969,7 @@ class OmniImageStudioApp(ctk.CTk):
 
         self.btn_nav_clean_lsb = ctk.CTkButton(
             nav_bar, text="🧹  Tẩy Logo Ẩn", width=105, height=26, corner_radius=6,
-            font=ctk.CTkFont("Segoe UI", 10),
+            font=ctk.CTkFont("Segoe UI", 10, "bold"),
             fg_color=(BG_SUB_LIGHT, BG_SUB_DARK),
             hover_color=(BORDER_LIGHT, BORDER_DARK),
             text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
@@ -915,21 +994,21 @@ class OmniImageStudioApp(ctk.CTk):
 
         ctk.CTkLabel(
             orig_hdr, text="ẢNH GỐC (ORIGINAL)",
-            font=ctk.CTkFont("Segoe UI", 10, "bold"),
-            text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
         ).grid(row=0, column=0, sticky="w")
 
         self.badge_orig = ctk.CTkLabel(
             orig_hdr, text="—",
-            font=ctk.CTkFont("Segoe UI", 10),
-            text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
+            font=ctk.CTkFont("Segoe UI", 10, "bold"),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
         )
         self.badge_orig.grid(row=0, column=1, sticky="e")
 
         self.lbl_img_orig = ctk.CTkLabel(
             self.pane_orig,
             text="Kéo thả ảnh vào đây\nhoặc bấm 'Chọn File Ảnh'",
-            font=ctk.CTkFont("Segoe UI", 12),
+            font=ctk.CTkFont("Segoe UI", 12, "bold"),
             text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
         )
         self.lbl_img_orig.grid(row=1, column=0, sticky="nsew", padx=8, pady=8)
@@ -950,7 +1029,7 @@ class OmniImageStudioApp(ctk.CTk):
 
         ctk.CTkLabel(
             proc_hdr, text="KẾT QUẢ XỬ LÝ (LIVE PREVIEW)",
-            font=ctk.CTkFont("Segoe UI", 10, "bold"),
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
             text_color=ACCENT
         ).grid(row=0, column=0, sticky="w")
 
@@ -964,7 +1043,7 @@ class OmniImageStudioApp(ctk.CTk):
         self.lbl_img_proc = ctk.CTkLabel(
             self.pane_proc,
             text="Xem trước trực quan\nkết quả sau khi chuyển đổi",
-            font=ctk.CTkFont("Segoe UI", 12),
+            font=ctk.CTkFont("Segoe UI", 12, "bold"),
             text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
         )
         self.lbl_img_proc.grid(row=1, column=0, sticky="nsew", padx=8, pady=8)
@@ -987,8 +1066,8 @@ class OmniImageStudioApp(ctk.CTk):
         self.lbl_stats = ctk.CTkLabel(
             self.stats_frame,
             text="Chưa có ảnh nào trong danh sách",
-            font=ctk.CTkFont("Segoe UI", 11),
-            text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
         )
         self.lbl_stats.grid(row=0, column=0, padx=12, sticky="w")
 
