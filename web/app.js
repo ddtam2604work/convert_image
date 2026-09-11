@@ -11,6 +11,8 @@
     files: [],              // Array of { id, file, name, img, origW, origH, status, procBlob, customMask }
     activeIndex: -1,
     theme: 'light',
+    viewMode: 'compare',   // 'compare', 'single-proc', 'single-orig'
+    zoomFit: true,         // true: fill box, false: 100% actual size
     config: {
       format: 'WEBP',
       quality: 0.90,
@@ -121,7 +123,11 @@
     lblCurrentFilename: document.getElementById('lblCurrentFilename'),
     btnNavCanva: document.getElementById('btnNavCanva'),
     btnNavErase: document.getElementById('btnNavErase'),
-    btnNavClean: document.getElementById('btnNavClean'),
+    btnModeCompare: document.getElementById('btnModeCompare'),
+    btnModeSingleProc: document.getElementById('btnModeSingleProc'),
+    btnModeSingleOrig: document.getElementById('btnModeSingleOrig'),
+    btnToggleZoom: document.getElementById('btnToggleZoom'),
+    comparisonGrid: document.querySelector('.comparison-grid'),
     btnDownloadCurrent: document.getElementById('btnDownloadCurrent'),
 
     paneOrigDrop: document.getElementById('paneOrigDrop'),
@@ -129,6 +135,7 @@
     placeholderOrig: document.getElementById('placeholderOrig'),
     imgOrig: document.getElementById('imgOrig'),
 
+    paneProc: document.querySelector('.pane-proc'),
     badgeProc: document.getElementById('badgeProc'),
     placeholderProc: document.getElementById('placeholderProc'),
     canvasPreview: document.getElementById('canvasPreview'),
@@ -349,6 +356,12 @@
     el.btnPrevImg.addEventListener('click', () => selectImageIndex(state.activeIndex - 1));
     el.btnNextImg.addEventListener('click', () => selectImageIndex(state.activeIndex + 1));
 
+    // View mode pills & zoom toggle (Cho phép xem ảnh to cực đại)
+    if (el.btnModeCompare) el.btnModeCompare.addEventListener('click', () => setViewMode('compare'));
+    if (el.btnModeSingleProc) el.btnModeSingleProc.addEventListener('click', () => setViewMode('single-proc'));
+    if (el.btnModeSingleOrig) el.btnModeSingleOrig.addEventListener('click', () => setViewMode('single-orig'));
+    if (el.btnToggleZoom) el.btnToggleZoom.addEventListener('click', toggleZoomMode);
+
     // Studio openers
     el.btnOpenCanvaStudio.addEventListener('click', openCanvaStudioModal);
     el.btnNavCanva.addEventListener('click', openCanvaStudioModal);
@@ -414,6 +427,38 @@
       el.tabQueue.style.display = 'flex';
       renderQueueTable();
     }
+  }
+
+  function setViewMode(mode) {
+    state.viewMode = mode;
+    if (el.btnModeCompare) el.btnModeCompare.classList.toggle('active', mode === 'compare');
+    if (el.btnModeSingleProc) el.btnModeSingleProc.classList.toggle('active', mode === 'single-proc');
+    if (el.btnModeSingleOrig) el.btnModeSingleOrig.classList.toggle('active', mode === 'single-orig');
+
+    if (!el.comparisonGrid) return;
+    if (mode === 'compare') {
+      el.comparisonGrid.style.gridTemplateColumns = '1fr 1fr';
+      if (el.paneOrigDrop) el.paneOrigDrop.style.display = 'flex';
+      if (el.paneProc) el.paneProc.style.display = 'flex';
+    } else if (mode === 'single-proc') {
+      el.comparisonGrid.style.gridTemplateColumns = '1fr';
+      if (el.paneOrigDrop) el.paneOrigDrop.style.display = 'none';
+      if (el.paneProc) el.paneProc.style.display = 'flex';
+    } else if (mode === 'single-orig') {
+      el.comparisonGrid.style.gridTemplateColumns = '1fr';
+      if (el.paneProc) el.paneProc.style.display = 'none';
+      if (el.paneOrigDrop) el.paneOrigDrop.style.display = 'flex';
+    }
+  }
+
+  function toggleZoomMode() {
+    state.zoomFit = !state.zoomFit;
+    if (el.btnToggleZoom) {
+      el.btnToggleZoom.textContent = state.zoomFit ? '🔍 Vừa Khung' : '🔍 100% Gốc';
+      el.btnToggleZoom.title = state.zoomFit ? 'Đang xem vừa khung tối đa. Bấm để xem kích thước thực 100%' : 'Đang xem kích thước thực 100%. Bấm để phóng to vừa khung tối đa';
+    }
+    if (el.imgOrig) el.imgOrig.classList.toggle('zoom-actual', !state.zoomFit);
+    if (el.canvasPreview) el.canvasPreview.classList.toggle('zoom-actual', !state.zoomFit);
   }
 
   // ─── DRAG AND DROP & CLIPBOARD ────────────────────────────────────────────
@@ -567,6 +612,8 @@
     el.placeholderOrig.style.display = 'none';
     el.imgOrig.style.display = 'block';
     el.imgOrig.src = item.src;
+    el.imgOrig.classList.toggle('zoom-actual', !state.zoomFit);
+    el.canvasPreview.classList.toggle('zoom-actual', !state.zoomFit);
     el.badgeOrig.textContent = `${item.origW} × ${item.origH} px (${formatBytes(item.sizeBytes)})`;
 
     updateHeaderCount();

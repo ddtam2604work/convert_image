@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%238C6849'/><text x='50%' y='68%' font-size='60' text-anchor='middle' fill='%23FAF7F2' font-family='Georgia'>✦</text></svg>">
-  <link rel="stylesheet" href="style.css?v=3.1">
+  <link rel="stylesheet" href="style.css?v=3.2">
   <!-- JSZip for multi-file batch downloads -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
@@ -166,9 +166,9 @@
             </button>
 
             <!-- Quick Background Selector -->
-            <div class="form-row mt-2">
-              <label class="form-label">Phông nền:</label>
-              <div class="segmented-ctrl flex-1" id="segBgMode">
+            <div class="mt-2">
+              <span class="form-label" style="display:block; margin-bottom: 4px;">Phông nền nhanh:</span>
+              <div class="segmented-ctrl" id="segBgMode">
                 <button class="seg-btn active" data-val="transparent">Trong suốt</button>
                 <button class="seg-btn" data-val="#FFFFFF">Trắng</button>
                 <button class="seg-btn" data-val="#F8F5F0">Kem be</button>
@@ -275,16 +275,23 @@
           <!-- Top Sub-Toolbar Inside Preview -->
           <div class="preview-nav-bar">
             <div class="nav-btn-group">
-              <button class="btn-nav-arrow" id="btnPrevImg">◀ Trước</button>
+              <button class="btn-nav-arrow" id="btnPrevImg" title="Ảnh trước">◀</button>
               <span class="nav-index-badge" id="lblImgIndex">Ảnh 0/0</span>
-              <button class="btn-nav-arrow" id="btnNextImg">Tiếp ▶</button>
+              <button class="btn-nav-arrow" id="btnNextImg" title="Ảnh tiếp theo">▶</button>
             </div>
-            <span class="current-filename" id="lblCurrentFilename">Chưa nạp ảnh nào</span>
+            <span class="current-filename" id="lblCurrentFilename" title="Tên ảnh hiện tại">Chưa nạp ảnh nào</span>
+
+            <!-- View Mode Switcher (Cho phép phóng to xem cực đại) -->
+            <div class="preview-mode-switch">
+              <button class="btn-mode-pill active" id="btnModeCompare" title="So sánh song song 2 ảnh gốc và kết quả">🌓 So Sánh (2 Ảnh)</button>
+              <button class="btn-mode-pill" id="btnModeSingleProc" title="Phóng to ảnh kết quả cực đại toàn màn hình">🖼 Phóng To Kết Quả</button>
+              <button class="btn-mode-pill" id="btnModeSingleOrig" title="Xem ảnh gốc đơn">👁 Ảnh Gốc</button>
+            </div>
 
             <div class="nav-tools-right">
-              <button class="btn-nav-tool btn-nav-canva" id="btnNavCanva">✨  Canva Studio</button>
-              <button class="btn-nav-tool btn-nav-erase" id="btnNavErase">🎨  Xóa Logo Hiện</button>
-              <button class="btn-nav-tool btn-nav-clean" id="btnNavClean">🧹  Tẩy Logo Ẩn</button>
+              <button class="btn-nav-tool btn-nav-canva" id="btnNavCanva" title="Mở Canva Background Studio">✨ Canva Studio</button>
+              <button class="btn-nav-tool btn-nav-erase" id="btnNavErase" title="Tô cọ xóa watermark / logo">🎨 Xóa Logo</button>
+              <button class="btn-nav-tool btn-nav-zoom" id="btnToggleZoom" title="Chuyển giữa Vừa Khung Tối Đa và Kích Thước Gốc 100%">🔍 Vừa Khung</button>
             </div>
           </div>
 
@@ -549,7 +556,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=3.1"></script>
+  <script src="app.js?v=3.2"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

@@ -90,14 +90,14 @@ body {
 
 /* ── 1. App Header ────────────────────────────────────────────── */
 .app-header {
-  height: 56px;
-  min-height: 56px;
+  height: 50px;
+  min-height: 50px;
   background: var(--bg-panel);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 18px;
+  padding: 0 16px;
   z-index: 10;
 }
 
@@ -109,7 +109,7 @@ body {
 
 .brand-star {
   font-family: var(--font-serif);
-  font-size: 1.6rem;
+  font-size: 1.5rem;
   color: var(--accent);
   line-height: 1;
 }
@@ -120,16 +120,16 @@ body {
 }
 
 .brand-sub {
-  font-size: 0.76rem;
+  font-size: 0.74rem;
   font-weight: 500;
   color: var(--text-muted);
   letter-spacing: normal;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 .brand-title {
   font-family: var(--font-serif);
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   font-weight: 700;
   color: var(--text-main);
   line-height: 1.1;
@@ -138,27 +138,30 @@ body {
 .header-right {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .file-count-label {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 700;
   color: var(--text-main);
+  white-space: nowrap;
 }
 
 .btn-theme-toggle {
   background: var(--bg-sub);
   border: 1px solid var(--border);
   color: var(--text-main);
-  padding: 6px 14px;
+  padding: 5px 12px;
   border-radius: var(--radius-sm);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 700;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: all 0.2s;
 }
 
@@ -171,38 +174,46 @@ body {
   flex: 1;
   display: flex;
   overflow: hidden;
+  min-height: 0;
 }
 
 /* ── 3. App Sidebar ───────────────────────────────────────────── */
 .app-sidebar {
-  width: 380px;
-  min-width: 380px;
+  width: 350px;
+  min-width: 330px;
+  max-width: 360px;
   background: var(--bg-panel);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   height: 100%;
+  flex-shrink: 0;
 }
 
 .sidebar-quick-input {
-  padding: 10px 12px;
+  padding: 8px 10px;
   background: var(--bg-card);
   border-bottom: 1px solid var(--border);
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .btn-primary-action, .btn-secondary-action {
   flex: 1;
-  height: 36px;
+  min-width: 0;
+  height: 34px;
   border-radius: var(--radius-sm);
   font-family: var(--font-sans);
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   font-weight: 700;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 6px;
   transition: all 0.15s;
   border: none;
 }
@@ -273,17 +284,20 @@ body {
 
 .seg-btn {
   flex: 1;
-  padding: 6px 8px;
+  min-width: 0;
+  padding: 6px 2px;
   border: none;
   background: transparent;
   color: var(--text-main);
   font-family: var(--font-sans);
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 700;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-align: center;
 }
 
@@ -525,19 +539,25 @@ body {
 .btn-duo-row {
   display: flex;
   gap: 6px;
+  width: 100%;
 }
 
 .btn-sub-action, .btn-accent-action, .btn-warning-action, .btn-success-action {
   flex: 1;
-  height: 30px;
+  min-width: 0;
+  height: 32px;
   border-radius: var(--radius-sm);
   font-family: var(--font-sans);
-  font-size: 0.76rem;
+  font-size: 0.73rem;
   font-weight: 700;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 6px;
   border: none;
   transition: all 0.15s;
 }
@@ -688,28 +708,32 @@ body {
   padding: 4px 8px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  margin-bottom: 8px;
-  min-height: 36px;
+  margin-bottom: 6px;
+  min-height: 38px;
+  flex-shrink: 0;
 }
 
 .nav-btn-group {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
 }
 
 .btn-nav-arrow {
-  height: 26px;
+  height: 28px;
   padding: 0 10px;
   background: var(--bg-sub);
   color: var(--text-main);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   font-family: var(--font-sans);
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   font-weight: 800;
   cursor: pointer;
+  transition: all 0.15s;
 }
 .btn-nav-arrow:hover { background: var(--border); }
 
@@ -718,32 +742,76 @@ body {
   font-weight: 800;
   color: var(--accent);
   padding: 0 6px;
+  white-space: nowrap;
 }
 
 .current-filename {
-  font-size: 0.8rem;
-  font-weight: 800;
+  font-size: 0.78rem;
+  font-weight: 700;
   color: var(--text-main);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1;
+  max-width: 180px;
+  flex-shrink: 1;
+}
+
+/* Preview Mode Switcher (Cho phép phóng to cực đại) */
+.preview-mode-switch {
+  display: flex;
+  background: var(--bg-sub);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.btn-mode-pill {
+  padding: 4px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  font-size: 0.73rem;
+  font-weight: 800;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.btn-mode-pill:hover:not(.active) {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.btn-mode-pill.active {
+  background: var(--accent);
+  color: #FFFFFF;
+  box-shadow: 0 1px 4px rgba(140, 104, 73, 0.3);
 }
 
 .nav-tools-right {
   display: flex;
+  align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .btn-nav-tool {
-  height: 26px;
+  height: 28px;
   padding: 0 10px;
   border-radius: var(--radius-sm);
   font-family: var(--font-sans);
-  font-size: 0.72rem;
+  font-size: 0.73rem;
   font-weight: 800;
   border: none;
   cursor: pointer;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s;
 }
 
 .btn-nav-canva { background: var(--accent); color: #FFFFFF; }
@@ -752,17 +820,23 @@ body {
 .btn-nav-erase { background: var(--warning); color: #FFFFFF; }
 .btn-nav-erase:hover { background: var(--warning-hover); }
 
-.btn-nav-clean { background: var(--bg-sub); color: var(--text-main); border: 1px solid var(--border); }
-.btn-nav-clean:hover { background: var(--border); }
+.btn-nav-zoom {
+  background: var(--bg-sub);
+  color: var(--text-main);
+  border: 1px solid var(--border);
+}
+.btn-nav-zoom:hover { background: var(--border); }
 
-/* Comparison Grid */
+/* Comparison Grid & Panes */
 .comparison-grid {
   flex: 1;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
   overflow: hidden;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+  min-height: 0;
+  height: 100%;
 }
 
 .compare-pane {
@@ -772,6 +846,8 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
+  height: 100%;
 }
 
 .pane-proc {
@@ -779,43 +855,52 @@ body {
 }
 
 .pane-hdr {
+  height: 36px;
+  min-height: 36px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
+  padding: 0 12px;
   background: rgba(0, 0, 0, 0.02);
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 .pane-title {
-  font-size: 0.76rem;
+  font-size: 0.75rem;
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   color: var(--text-main);
+  white-space: nowrap;
 }
 
 .pane-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .pane-badge {
-  font-size: 0.74rem;
+  font-size: 0.73rem;
   font-weight: 700;
   color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .btn-pane-download {
   background: var(--accent);
   color: #FFFFFF;
   border: none;
-  padding: 2px 8px;
+  padding: 4px 10px;
   border-radius: 4px;
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-size: 0.73rem;
+  font-weight: 800;
   cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
 }
+.btn-pane-download:hover { background: var(--accent-hover); }
 
 .pane-canvas-box {
   flex: 1;
@@ -824,7 +909,10 @@ body {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  padding: 10px;
+  padding: 12px;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
 }
 
 .checker-bg {
@@ -869,12 +957,24 @@ body {
   color: var(--text-muted);
 }
 
+/* Make review image larger: fill the entire container proportionally */
 .preview-img, .preview-canvas {
+  width: 100%;
+  height: 100%;
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   border-radius: 4px;
+  transition: transform 0.15s ease;
+}
+
+.preview-img.zoom-actual, .preview-canvas.zoom-actual {
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  object-fit: none;
 }
 
 /* ── 5. Tab 2: Queue Table ────────────────────────────────────── */
