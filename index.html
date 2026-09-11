@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%238C6849'/><text x='50%' y='68%' font-size='60' text-anchor='middle' fill='%23FAF7F2' font-family='Georgia'>✦</text></svg>">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=3.1">
   <!-- JSZip for multi-file batch downloads -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
@@ -30,15 +30,8 @@
       <div class="header-brand">
         <span class="brand-star">✦</span>
         <div class="brand-text">
-          <span class="brand-sub">D E S I G N   W I T H   E M P A T H Y</span>
           <span class="brand-title">OmniImage Studio</span>
-        </div>
-        <div class="badge-pill">CANVA CUTOUT PRO</div>
-        <div class="swatch-strip" title="Aesthetic Color Palette">
-          <span class="swatch-dot" style="background:#FAF7F2;"></span>
-          <span class="swatch-dot" style="background:#E8E0D5;"></span>
-          <span class="swatch-dot" style="background:#BC9D82;"></span>
-          <span class="swatch-dot" style="background:#2C2B2A;"></span>
+          <span class="brand-sub">Công Cụ Chuyển Đổi & Xử Lý Ảnh Chuyên Nghiệp</span>
         </div>
       </div>
 
@@ -556,11 +549,13 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=3.1"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').catch(() => {});
+        navigator.serviceWorker.register('sw.js').then((reg) => {
+          reg.update();
+        }).catch(() => {});
       });
     }
   </script>

@@ -120,45 +120,19 @@ body {
 }
 
 .brand-sub {
-  font-size: 0.55rem;
-  font-weight: 800;
-  letter-spacing: 0.22em;
-  color: var(--accent);
-  text-transform: uppercase;
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: normal;
+  margin-top: 2px;
 }
 
 .brand-title {
   font-family: var(--font-serif);
-  font-size: 1.15rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--text-main);
   line-height: 1.1;
-}
-
-.badge-pill {
-  background: var(--accent);
-  color: #FFFFFF;
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  padding: 3px 8px;
-  border-radius: 6px;
-}
-
-.swatch-strip {
-  display: flex;
-  gap: 4px;
-  background: var(--bg-card);
-  padding: 4px 6px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-}
-
-.swatch-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .header-right {
