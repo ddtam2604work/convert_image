@@ -2,7 +2,7 @@
 
 > **Design with Empathy — Crafting Digital Visual Experiences That People Love**
 
-Bộ công cụ xử lý, chuyển đổi định dạng và tách nền ảnh chuyên nghiệp với phong cách thẩm mỹ **Warm Editorial Cream & Mocha**, hỗ trợ cả phiên bản **Desktop App (Native Windows EXE)** và **Web Application (Interactive Canvas)**.
+Bộ công cụ xử lý, chuyển đổi định dạng và tách nền ảnh chuyên nghiệp với phong cách thẩm mỹ **Modern Creative Studio (Slate & Indigo)**, hỗ trợ cả phiên bản **Desktop App (Native Windows EXE)** và **Web Application (Interactive Canvas)**.
 
 ---
 
@@ -12,7 +12,7 @@ Bộ công cụ xử lý, chuyển đổi định dạng và tách nền ảnh c
 - **Tách nền thông minh 1-chạm**: Tự động nhận diện chủ thể và loại bỏ phông nền với đường viền mượt mà (smooth edge alpha matting).
 - **Thay đổi phông nền linh hoạt**:
   - **Trong suốt**: Xuất ảnh PNG/WEBP không nền.
-  - **Màu trơn thời thượng**: Bảng màu sẵn có (Trắng tinh khôi, Đen than, Kem Be ấm `#F8F5F0`, Nâu Mocha `#8C6849`, Xanh Sage `#5B7A58`, Be cát `#E2D7C8`) hoặc hộp thoại Color Picker chọn bất kỳ mã màu hex nào.
+  - **Màu trơn thời thượng**: Bảng màu sẵn có (Trắng tinh khôi `#FFFFFF`, Xám nhạt `#F1F5F9`, Đen Slate `#0F172A`, Indigo `#4F46E5`, Emerald `#059669`, Blue `#3B82F6`) hoặc hộp thoại Color Picker chọn bất kỳ mã màu hex nào.
   - **Làm mờ hậu cảnh (Bokeh Blur)**: Giữ chủ thể nét căng, làm mờ phông nền phía sau giống chụp ảnh chân dung studio.
 - **Hiệu ứng đồ họa độc quyền của Canva**:
   - **Đổ bóng mềm (Drop Shadow)**: Thêm bóng đổ tự nhiên dưới chân hoặc viền vật thể với tùy chỉnh độ lệch, độ mờ (blur radius) và độ trong suốt (opacity).
@@ -82,7 +82,7 @@ Màn hình console sẽ hiển thị địa chỉ IP cục bộ, ví dụ:
 convert_image/
 ├── OmniImageStudio.exe      # File thực thi Windows độc lập (75 MB)
 ├── index.html              # Web App chính (chạy trực tiếp trên GitHub Pages)
-├── style.css               # Phong cách Warm Editorial & Responsive Phone Mockup
+├── style.css               # Phong cách Modern Creative Studio & Responsive Layout
 ├── app.js                  # Engine xử lý Canvas client-side
 ├── manifest.json           # Cấu hình PWA (cài app trên điện thoại)
 ├── sw.js                   # Service Worker hỗ trợ offline & tải nhanh
@@ -93,7 +93,7 @@ convert_image/
 ├── web/                    # Thư mục web độc lập
 ├── src/
 │   ├── core_engine.py      # Bộ xử lý ảnh nền tảng (Pillow, OpenCV, GrabCut)
-│   └── main_gui.py         # Giao diện Desktop CustomTkinter Warm Cream & Mocha
+│   └── main_gui.py         # Giao diện Desktop CustomTkinter Modern Creative Studio
 └── samples/                # Ảnh mẫu thử nghiệm
 ```
 

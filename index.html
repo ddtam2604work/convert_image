@@ -8,12 +8,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,400&family=Italianno&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <meta name="theme-color" content="#8C6849">
+  <meta name="theme-color" content="#4F46E5">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.json">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%238C6849'/><text x='50%' y='68%' font-size='60' text-anchor='middle' fill='%23FAF7F2' font-family='Georgia'>✦</text></svg>">
-  <link rel="stylesheet" href="style.css?v=3.2">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%234F46E5'/><text x='50%' y='68%' font-size='60' text-anchor='middle' fill='%23FFFFFF' font-family='Georgia'>✦</text></svg>">
+  <link rel="stylesheet" href="style.css?v=4.0">
   <!-- JSZip for multi-file batch downloads -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
@@ -51,7 +51,7 @@
         <!-- Quick Input Card -->
         <div class="sidebar-quick-input">
           <button class="btn-primary-action" id="btnSelectFiles">
-            <span>📂  Chọn File Ảnh…</span>
+            <span>📂  Chọn File Ảnh</span>
           </button>
           <button class="btn-secondary-action" id="btnPasteClipboard" title="Dán ảnh từ bộ nhớ tạm (Ctrl+V)">
             <span>📋  Dán (Ctrl+V)</span>
@@ -63,7 +63,7 @@
 
           <!-- Card: Format & Compression -->
           <div class="section-header">
-            <span class="section-indicator" style="background:#8C6849;"></span>
+            <span class="section-indicator"></span>
             <span class="section-title">🔄  ĐỊNH DẠNG & NÉN</span>
           </div>
           <div class="tool-card">
@@ -96,7 +96,7 @@
 
           <!-- Card: Resize & Frame Presets -->
           <div class="section-header mt-3">
-            <span class="section-indicator" style="background:#8C6849;"></span>
+            <span class="section-indicator"></span>
             <span class="section-title">📐  KÍCH THƯỚC & KHUNG HÌNH</span>
           </div>
           <div class="tool-card">
@@ -150,7 +150,7 @@
 
           <!-- Card: Canva Cutout & Sharpen -->
           <div class="section-header mt-3">
-            <span class="section-indicator" style="background:#8C6849;"></span>
+            <span class="section-indicator"></span>
             <span class="section-title">✨  TÁCH NỀN CHUẨN CANVA & LÀM NÉT</span>
           </div>
           <div class="tool-card">
@@ -162,7 +162,7 @@
             </label>
 
             <button class="btn-studio-open mt-2" id="btnOpenCanvaStudio">
-              <span>🎨  Mở Canva Background Studio…</span>
+              <span>🎨  Mở Canva Background Studio</span>
             </button>
 
             <!-- Quick Background Selector -->
@@ -211,13 +211,13 @@
 
           <!-- Card: Steganography & Logo Eraser -->
           <div class="section-header mt-3">
-            <span class="section-indicator" style="background:#8C6849;"></span>
+            <span class="section-indicator"></span>
             <span class="section-title">🛡  THỦY VÂN & XÓA LOGO</span>
           </div>
           <div class="tool-card">
             <div class="btn-duo-row">
               <button class="btn-sub-action" id="btnSelectLogo" title="Nhúng văn bản hoặc logo bản quyền ẩn">
-                🛡  Nhúng Logo…
+                🛡  Nhúng Logo
               </button>
               <button class="btn-accent-action" id="btnOpenStegoInspector" title="Soi bitplane tìm dữ liệu ẩn">
                 🔍  Soi Logo Ẩn
@@ -408,7 +408,7 @@
         <div class="studio-right-panel">
           <!-- Section 1: Magic Cutout -->
           <div class="section-header">
-            <span class="section-indicator" style="background:#8C6849;"></span>
+            <span class="section-indicator"></span>
             <span class="section-title">✨  TÁCH NỀN THÔNG MINH</span>
           </div>
           <div class="tool-card">
@@ -424,7 +424,7 @@
 
           <!-- Section 2: Background Replacement -->
           <div class="section-header mt-3">
-            <span class="section-indicator" style="background:#8C6849;"></span>
+            <span class="section-indicator"></span>
             <span class="section-title">🎨  THAY ĐỔI PHÔNG NỀN</span>
           </div>
           <div class="tool-card">
@@ -437,12 +437,12 @@
             <!-- Color Palette Row -->
             <div class="palette-swatches-row mt-2">
               <button class="palette-swatch" style="background:#FFFFFF;" data-color="#FFFFFF" title="Trắng"></button>
-              <button class="palette-swatch" style="background:#FAF7F2;" data-color="#FAF7F2" title="Kem be"></button>
-              <button class="palette-swatch" style="background:#2C2B2A;" data-color="#2C2B2A" title="Đen"></button>
-              <button class="palette-swatch" style="background:#8C6849;" data-color="#8C6849" title="Mocha"></button>
-              <button class="palette-swatch" style="background:#5B7A58;" data-color="#5B7A58" title="Sage"></button>
-              <button class="palette-swatch" style="background:#E2D7C8;" data-color="#E2D7C8" title="Sand"></button>
-              <input type="color" id="studioColorPicker" value="#FAF7F2" class="custom-color-input" title="Chọn màu bất kỳ">
+              <button class="palette-swatch" style="background:#F1F5F9;" data-color="#F1F5F9" title="Xám nhạt"></button>
+              <button class="palette-swatch" style="background:#0F172A;" data-color="#0F172A" title="Đen Slate"></button>
+              <button class="palette-swatch" style="background:#4F46E5;" data-color="#4F46E5" title="Indigo"></button>
+              <button class="palette-swatch" style="background:#059669;" data-color="#059669" title="Emerald"></button>
+              <button class="palette-swatch" style="background:#3B82F6;" data-color="#3B82F6" title="Blue"></button>
+              <input type="color" id="studioColorPicker" value="#F8FAFC" class="custom-color-input" title="Chọn màu bất kỳ">
             </div>
 
             <!-- Blur Slider -->
@@ -457,7 +457,7 @@
 
           <!-- Section 3: Graphic Photo Effects -->
           <div class="section-header mt-3">
-            <span class="section-indicator" style="background:#8C6849;"></span>
+            <span class="section-indicator"></span>
             <span class="section-title">🪄  HIỆU ỨNG ĐỒ HỌA CANVA</span>
           </div>
           <div class="tool-card">
@@ -556,7 +556,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=3.2"></script>
+  <script src="app.js?v=4.0"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

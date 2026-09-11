@@ -1,10 +1,10 @@
-// OmniImage Studio Service Worker v3.2
-const CACHE_NAME = 'omniimage-v3.2';
+// OmniImage Studio Service Worker v4.0
+const CACHE_NAME = 'omniimage-v4.0';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './style.css?v=3.2',
-  './app.js?v=3.2',
+  './style.css?v=4.0',
+  './app.js?v=4.0',
   './manifest.json'
 ];
 

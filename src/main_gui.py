@@ -38,40 +38,40 @@ from core_engine import NativeImageEngine
 ctk.set_appearance_mode("Light")
 ctk.set_default_color_theme("blue")
 
-# ─── COLOR PALETTE TOKENS (WARM EDITORIAL CREAM & CHARCOAL MOCHA) ───────────
-# App Backgrounds (Matching reference design: Warm Alabaster Cream & Deep Charcoal)
-BG_APP_DARK    = "#1e1b18"       # Deep warm charcoal
-BG_APP_LIGHT   = "#f8f5f0"       # Warm alabaster cream
-BG_PANEL_DARK  = "#262320"       # Warm charcoal surface
-BG_PANEL_LIGHT = "#ffffff"       # Pure white card surface
-BG_CARD_DARK   = "#2f2b27"       # Warm dark card
-BG_CARD_LIGHT  = "#f3eee5"       # Warm sand/cream card
-BG_SUB_DARK    = "#3d3732"       # Muted dark tone
-BG_SUB_LIGHT   = "#e9e1d4"       # Soft taupe beige
+# ─── COLOR PALETTE TOKENS (MODERN CREATIVE STUDIO — SLATE & VIBRANT INDIGO) ───
+# App Backgrounds (Matching Web Studio: Crisp Slate & Deep Midnight Slate)
+BG_APP_DARK    = "#0b0f19"       # Midnight Space Slate
+BG_APP_LIGHT   = "#f8fafc"       # Soft Light Slate (Slate-50)
+BG_PANEL_DARK  = "#111827"       # Deep Dark Panel
+BG_PANEL_LIGHT = "#ffffff"       # Pure White Card Surface
+BG_CARD_DARK   = "#1e293b"       # Slate-800 Card
+BG_CARD_LIGHT  = "#ffffff"       # Pure White Card
+BG_SUB_DARK    = "#334155"       # Slate-700 Sub/Inactive Container
+BG_SUB_LIGHT   = "#f1f5f9"       # Slate-100 Sub/Inactive Container
 
 # Borders
-BORDER_DARK    = "#484039"       # Warm dark border
-BORDER_LIGHT   = "#e3d8c8"       # Soft cream border
-BORDER_ACCENT  = "#8c6849"       # Warm mocha
+BORDER_DARK    = "#334155"       # Slate-700 Border
+BORDER_LIGHT   = "#e2e8f0"       # Slate-200 Subtle Border
+BORDER_ACCENT  = "#6366f1"       # Vibrant Indigo Border Focus
 
 # Typography — High contrast & ultra legible for Light & Dark modes
-TEXT_PRIMARY_D = "#fcfaf7"       # Warm ivory
-TEXT_PRIMARY_L = "#14100d"       # Deep rich espresso / near-black for maximum crispness
-TEXT_MUTED_D   = "#c7beb3"       # Muted warm gray
-TEXT_MUTED_L   = "#382e25"       # Strong dark mocha brown (high contrast, ultra legible)
-TEXT_FAINT_D   = "#9e9286"       # Subdued text dark
-TEXT_FAINT_L   = "#4d3f32"       # Subdued text light (clear and readable)
+TEXT_PRIMARY_D = "#f8fafc"       # Slate-50 Crisp White
+TEXT_PRIMARY_L = "#0f172a"       # Slate-900 High-contrast Near-Black
+TEXT_MUTED_D   = "#94a3b8"       # Slate-400
+TEXT_MUTED_L   = "#475569"       # Slate-600
+TEXT_FAINT_D   = "#64748b"       # Slate-500
+TEXT_FAINT_L   = "#94a3b8"       # Slate-400
 
 # Semantic Brand Accents
-ACCENT         = "#8c6849"       # Warm Mocha Brown (Brand)
-ACCENT_HOVER   = "#745438"
-ACCENT_LIGHT   = "#cbb7a2"       # Warm Sand
-SUCCESS        = "#5b7a58"       # Muted Sage Green
-SUCCESS_HOVER  = "#496346"
-WARNING        = "#b87d4b"       # Warm Ochre / Terracotta
-WARNING_HOVER  = "#9d683b"
-DANGER         = "#ba4d4d"       # Muted Terracotta Red
-DANGER_HOVER   = "#a03d3d"
+ACCENT         = "#4f46e5"       # Vibrant Studio Indigo (Brand)
+ACCENT_HOVER   = "#4338ca"       # Indigo-700
+ACCENT_LIGHT   = "#eef2ff"       # Indigo-50
+SUCCESS        = "#059669"       # Emerald Green-600 (CTA Start Convert)
+SUCCESS_HOVER  = "#047857"       # Emerald-700
+WARNING        = "#d97706"       # Amber-600
+WARNING_HOVER  = "#b45309"       # Amber-700
+DANGER         = "#ef4444"       # Rose Red-500
+DANGER_HOVER   = "#dc2626"       # Rose-600
 
 # ─── HIGH CONTRAST WIDGET CONTRAST ENHANCEMENTS ─────────────────────────────
 # Automatically ensure high contrast text colors for Segmented Buttons,
@@ -320,11 +320,11 @@ class OmniImageStudioApp(ctk.CTk):
 
         BadgePill(brand_frame, "CANVA CUTOUT PRO", color=ACCENT).pack(side="left", padx=(0, 14))
 
-        # Aesthetic Color Swatch Preview Pill (from the reference image)
+        # Aesthetic Color Swatch Preview Pill
         swatch_frame = ctk.CTkFrame(brand_frame, fg_color=(BG_CARD_LIGHT, BG_CARD_DARK), corner_radius=12, border_width=1, border_color=(BORDER_LIGHT, BORDER_DARK))
         swatch_frame.pack(side="left", padx=(0, 10), pady=4)
-        for c in ("#FAF7F2", "#E8E0D5", "#BC9D82", "#2C2B2A"):
-            dot = ctk.CTkFrame(swatch_frame, width=14, height=14, corner_radius=7, fg_color=c, border_width=1, border_color="#d6ccbe")
+        for c in ("#4F46E5", "#059669", "#3B82F6", "#0F172A"):
+            dot = ctk.CTkFrame(swatch_frame, width=14, height=14, corner_radius=7, fg_color=c, border_width=1, border_color=(BORDER_LIGHT, BORDER_DARK))
             dot.pack(side="left", padx=3, pady=3)
 
         # Right Controls: Count Badge + Theme Toggle
@@ -376,7 +376,7 @@ class OmniImageStudioApp(ctk.CTk):
         top_input.grid_columnconfigure(1, weight=1)
 
         self.btn_select_files = ctk.CTkButton(
-            top_input, text="📂  Chọn File Ảnh…",
+            top_input, text="📂  Chọn File Ảnh",
             height=34, corner_radius=8,
             font=ctk.CTkFont("Segoe UI", 11, "bold"),
             fg_color=ACCENT, hover_color=ACCENT_HOVER,
@@ -641,10 +641,10 @@ class OmniImageStudioApp(ctk.CTk):
         # 2. Studio Launcher Button
         self.btn_open_canva_studio = ctk.CTkButton(
             card,
-            text="🎨  Mở Canva Background Studio…",
-            height=32, corner_radius=8,
+            text="🎨  Mở Canva Background Studio",
+            height=34, corner_radius=8,
             font=ctk.CTkFont("Segoe UI", 11, "bold"),
-            fg_color=ACCENT, hover_color=ACCENT_HOVER,
+            fg_color=("#6366F1", "#4F46E5"), hover_color=("#4F46E5", "#4338CA"),
             text_color="white",
             command=self.open_canva_background_studio
         )
@@ -779,10 +779,11 @@ class OmniImageStudioApp(ctk.CTk):
         # Row 0: Embed Logo & Inspect Hidden Logo
         self.btn_select_logo = ctk.CTkButton(
             card,
-            text="🛡  Nhúng Logo…", height=30, corner_radius=6,
+            text="🛡  Nhúng Logo", height=30, corner_radius=6,
             fg_color=(BG_SUB_LIGHT, BG_SUB_DARK),
             hover_color=(BORDER_LIGHT, BORDER_DARK),
             text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
+            border_width=1, border_color=(BORDER_LIGHT, BORDER_DARK),
             font=ctk.CTkFont("Segoe UI", 11, "bold"),
             command=self.select_hidden_logo
         )
@@ -791,7 +792,10 @@ class OmniImageStudioApp(ctk.CTk):
         self.btn_detect_stego = ctk.CTkButton(
             card,
             text="🔍  Soi Logo Ẩn", height=30, corner_radius=6,
-            fg_color=ACCENT, hover_color=ACCENT_HOVER,
+            fg_color=("#EFF6FF", "#1E293B"),
+            hover_color=("#DBEAFE", "#334155"),
+            text_color=("#2563EB", "#93C5FD"),
+            border_width=1, border_color=("#BFDBFE", "#3B82F6"),
             font=ctk.CTkFont("Segoe UI", 11, "bold"),
             command=self.open_stego_inspector
         )
@@ -801,7 +805,7 @@ class OmniImageStudioApp(ctk.CTk):
             card,
             text="Chưa chọn logo nhúng",
             font=ctk.CTkFont("Segoe UI", 10, "bold"),
-            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
+            text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
         )
         self.lbl_logo_info.grid(row=1, column=0, columnspan=2, padx=8, pady=(0, 4), sticky="w")
 
@@ -814,9 +818,11 @@ class OmniImageStudioApp(ctk.CTk):
         self.btn_erase_visible = ctk.CTkButton(
             card,
             text="🎨  Xóa Logo Hiện", height=30, corner_radius=6,
-            fg_color=WARNING, hover_color=WARNING_HOVER,
+            fg_color=("#FEF3C7", "#2D261E"),
+            hover_color=("#FDE68A", "#3D3428"),
             font=ctk.CTkFont("Segoe UI", 11, "bold"),
-            text_color="white",
+            text_color=("#D97706", "#FCD34D"),
+            border_width=1, border_color=("#FDE68A", "#D97706"),
             command=self.open_watermark_eraser_studio
         )
         self.btn_erase_visible.grid(row=3, column=0, padx=(8, 4), pady=(4, 4), sticky="ew")
@@ -827,6 +833,7 @@ class OmniImageStudioApp(ctk.CTk):
             fg_color=(BG_SUB_LIGHT, BG_SUB_DARK),
             hover_color=(BORDER_LIGHT, BORDER_DARK),
             text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
+            border_width=1, border_color=(BORDER_LIGHT, BORDER_DARK),
             font=ctk.CTkFont("Segoe UI", 11, "bold"),
             command=self.quick_sanitize_current_image
         )
@@ -1146,10 +1153,10 @@ class OmniImageStudioApp(ctk.CTk):
             self.canva_bg_color.set("#FFFFFF")
         elif value == "Kem be":
             self.canva_bg_mode.set("color")
-            self.canva_bg_color.set("#F8F5F0")
+            self.canva_bg_color.set("#F1F5F9")
         elif value == "Đen":
             self.canva_bg_mode.set("color")
-            self.canva_bg_color.set("#23201E")
+            self.canva_bg_color.set("#0F172A")
         self.schedule_live_preview()
 
     def _on_preset_selected(self, choice):
@@ -2020,16 +2027,16 @@ class OmniImageStudioApp(ctk.CTk):
 
         swatches = [
             ("#FFFFFF", "Trắng"),
-            ("#F8F5F0", "Kem be"),
-            ("#23201E", "Đen"),
-            ("#8C6849", "Mocha"),
-            ("#5B7A58", "Sage"),
-            ("#E2D7C8", "Sand"),
+            ("#F1F5F9", "Xám nhạt"),
+            ("#0F172A", "Đen Slate"),
+            ("#4F46E5", "Indigo"),
+            ("#059669", "Emerald"),
+            ("#3B82F6", "Blue"),
         ]
         for hex_col, name in swatches:
             btn_sw = ctk.CTkButton(
                 frame_palette, text="", width=24, height=24, corner_radius=12,
-                fg_color=hex_col, hover_color=hex_col, border_width=1, border_color="#c8beae",
+                fg_color=hex_col, hover_color=hex_col, border_width=1, border_color=(BORDER_LIGHT, BORDER_DARK),
                 command=lambda c=hex_col: on_select_color(c)
             )
             btn_sw.pack(side="left", padx=2)
