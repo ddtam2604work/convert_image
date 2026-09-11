@@ -1424,7 +1424,14 @@ body {
 }
 
 /* Watermark & Stego Modals */
-.modal-watermark-dialog, .modal-stego-dialog {
+.modal-watermark-dialog {
+  width: 95vw;
+  max-width: 1240px;
+  height: 88vh;
+  max-height: 860px;
+}
+
+.modal-stego-dialog {
   width: 820px;
   height: 600px;
 }
@@ -1461,7 +1468,30 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
   cursor: crosshair;
+  user-select: none;
+}
+
+.inpaint-canvas-wrap canvas {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  border-radius: var(--radius-sm);
+}
+
+.inpaint-status-box {
+  background: var(--bg-sub);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
 }
 
 .modal-footer {

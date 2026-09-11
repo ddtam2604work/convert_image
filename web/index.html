@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%234F46E5'/><text x='50%' y='68%' font-size='60' text-anchor='middle' fill='%23FFFFFF' font-family='Georgia'>✦</text></svg>">
-  <link rel="stylesheet" href="style.css?v=4.0">
+  <link rel="stylesheet" href="style.css?v=4.1">
   <!-- JSZip for multi-file batch downloads -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
@@ -212,7 +212,7 @@
           <!-- Card: Steganography & Logo Eraser -->
           <div class="section-header mt-3">
             <span class="section-indicator"></span>
-            <span class="section-title">🛡  THỦY VÂN & XÓA LOGO</span>
+            <span class="section-title">🛡  THỦY VÂN & XÓA VẬT THỂ</span>
           </div>
           <div class="tool-card">
             <div class="btn-duo-row">
@@ -229,8 +229,8 @@
             <div class="divider-line my-2"></div>
 
             <div class="btn-duo-row">
-              <button class="btn-warning-action" id="btnOpenWatermarkStudio" title="Tô cọ xóa watermark trực tiếp">
-                🎨  Xóa Logo Hiện
+              <button class="btn-warning-action" id="btnOpenWatermarkStudio" title="Xóa vật thể, người thừa, logo hoặc watermark trên ảnh">
+                🪄  Xóa Vật Thể
               </button>
               <button class="btn-sub-action" id="btnQuickSanitize" title="Tẩy sạch thông tin ẩn trong bitplane">
                 🧹  Tẩy Logo Ẩn
@@ -290,7 +290,7 @@
 
             <div class="nav-tools-right">
               <button class="btn-nav-tool btn-nav-canva" id="btnNavCanva" title="Mở Canva Background Studio">✨ Canva Studio</button>
-              <button class="btn-nav-tool btn-nav-erase" id="btnNavErase" title="Tô cọ xóa watermark / logo">🎨 Xóa Logo</button>
+              <button class="btn-nav-tool btn-nav-erase" id="btnNavErase" title="Mở Studio Xóa vật thể & logo (Magic Inpainting)">🪄 Xóa Vật Thể</button>
               <button class="btn-nav-tool btn-nav-zoom" id="btnToggleZoom" title="Chuyển giữa Vừa Khung Tối Đa và Kích Thước Gốc 100%">🔍 Vừa Khung</button>
             </div>
           </div>
@@ -485,37 +485,107 @@
     </div>
   </div>
 
-  <!-- ── 4. MODAL: WATERMARK / LOGO ERASER STUDIO ───────────────── -->
+  <!-- ── 4. MODAL: OBJECT & WATERMARK ERASER STUDIO (MAGIC INPAINTING) ───────────────── -->
   <div class="modal-backdrop" id="modalWatermarkStudio" style="display: none;">
     <div class="modal-dialog modal-watermark-dialog">
       <div class="modal-header">
         <div class="modal-title-group">
-          <span class="modal-icon text-warning">🎨</span>
-          <span class="modal-title">STUDIO XÓA LOGO & THỦY VÂN (OBJECT INPAINTING)</span>
+          <span class="modal-icon text-warning">🪄</span>
+          <span class="modal-title">STUDIO XÓA VẬT THỂ & LOGO — MAGIC OBJECT INPAINTING</span>
         </div>
         <button class="modal-close-btn" id="btnCloseWatermarkStudio">✕</button>
       </div>
 
-      <div class="modal-body-watermark">
-        <div class="watermark-canvas-stage">
-          <div class="watermark-top-bar">
-            <span class="form-label">Tô đỏ vùng logo / chữ cần xóa:</span>
-            <span class="form-label ml-auto">Cỡ cọ:</span>
-            <span class="val-badge text-accent" id="lblInpaintBrushSize">20px</span>
-            <input type="range" id="sliderInpaintBrush" min="5" max="60" value="20" class="custom-slider brush-slider">
-            <button class="btn-sub-action ml-2" id="btnInpaintClearMask">🧹 Xóa vùng chọn</button>
-            <button class="btn-warning-action ml-2" id="btnRunInpaint">⚡ Bắt đầu xóa</button>
+      <div class="modal-body-studio">
+        <!-- Left: Interactive Inpainting Canvas Area -->
+        <div class="studio-left-canvas">
+          <!-- Canvas Top Toolbar -->
+          <div class="studio-top-bar">
+            <button class="btn-sub-action" id="btnInpaintCompare" title="Giữ chuột để xem ảnh gốc">👁 Giữ xem ảnh gốc</button>
+            <div class="v-divider"></div>
+            <span class="form-label">Công cụ:</span>
+            <div class="segmented-ctrl" id="segInpaintTool">
+              <button class="seg-btn active" data-tool="brush" title="Dùng cọ quét tự do lên vật thể">🖌 Cọ xóa</button>
+              <button class="seg-btn" data-tool="rect" title="Kéo khung chữ nhật bao quanh vật thể">⏹ Khung chữ nhật</button>
+              <button class="seg-btn" data-tool="eraser" title="Tẩy bớt vùng chọn nhầm">🧹 Cục tẩy</button>
+            </div>
+            <span class="form-label ml-2">Cỡ cọ:</span>
+            <span class="val-badge text-accent" id="lblInpaintBrushSize">24px</span>
+            <input type="range" id="sliderInpaintBrush" min="5" max="90" value="24" class="custom-slider brush-slider">
+            <button class="btn-sub-action ml-auto" id="btnInpaintUndo" title="Hoàn tác bước vẽ trước">↺ Hoàn tác</button>
+            <button class="btn-sub-action ml-1 text-danger" id="btnInpaintClearMask" title="Xóa toàn bộ mặt nạ đã chọn">✕ Xóa mặt nạ</button>
           </div>
 
-          <div class="inpaint-canvas-wrap">
-            <canvas id="inpaintCanvas"></canvas>
+          <div class="studio-canvas-stage checker-bg" id="inpaintStageWrap">
+            <div class="inpaint-canvas-wrap" id="inpaintContainer">
+              <canvas id="inpaintCanvas"></canvas>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="modal-footer">
-        <button class="btn-sub-action" id="btnCancelWatermark">Hủy</button>
-        <button class="btn-primary-action" id="btnApplyWatermark">✓ Lưu kết quả</button>
+        <!-- Right: Control Panel (320px) -->
+        <div class="studio-right-panel">
+          <!-- Section 1: Algorithm -->
+          <div class="section-header">
+            <span class="section-indicator"></span>
+            <span class="section-title">⚙  THUẬT TOÁN TÁI TẠO</span>
+          </div>
+          <div class="tool-card">
+            <label class="form-label mb-1">Phương pháp inpainting:</label>
+            <select class="custom-select w-full" id="selInpaintMethod">
+              <option value="telea" selected>Telea FMM (Biên sắc nét - Khuyên dùng)</option>
+              <option value="ns">Navier-Stokes (Chuyển sắc mượt)</option>
+            </select>
+          </div>
+
+          <!-- Section 2: Inpaint Radius -->
+          <div class="section-header mt-3">
+            <span class="section-indicator"></span>
+            <span class="section-title">📏  BÁN KÍNH HÒA TRỘN VIỀN</span>
+          </div>
+          <div class="tool-card">
+            <div class="slider-header">
+              <span class="form-label">Khoảng lan tỏa biên:</span>
+              <span class="val-badge text-accent" id="lblInpaintRadius">4px</span>
+            </div>
+            <input type="range" id="sliderInpaintRadius" min="1" max="15" value="4" class="custom-slider accent-slider">
+          </div>
+
+          <!-- Section 3: Options -->
+          <div class="section-header mt-3">
+            <span class="section-indicator"></span>
+            <span class="section-title">🛡  TÙY CHỌN BẢO MẬT</span>
+          </div>
+          <div class="tool-card">
+            <label class="custom-checkbox-row">
+              <input type="checkbox" id="chkInpaintAlsoLsb" checked>
+              <span class="checkbox-box"></span>
+              <span class="checkbox-text font-bold">🧹 Đồng thời xóa sạch logo ẩn (LSB)</span>
+            </label>
+          </div>
+
+          <!-- Section 4: Execution -->
+          <div class="section-header mt-3">
+            <span class="section-indicator"></span>
+            <span class="section-title">⚡  THỰC THI</span>
+          </div>
+          <div class="tool-card">
+            <div class="inpaint-status-box mb-2" id="lblInpaintStatus">
+              Chưa xóa  •  Quét cọ hoặc khoanh khung lên vật thể rồi bấm nút bên dưới
+            </div>
+            <button class="btn-warning-action w-full font-bold py-2" id="btnRunInpaint">
+              ⚡  XÓA VẬT THỂ NGAY
+            </button>
+          </div>
+
+          <!-- Studio Modal Actions -->
+          <div class="studio-bottom-actions mt-auto">
+            <div class="btn-duo-row">
+              <button class="btn-sub-action" id="btnCancelWatermark">Hủy bỏ</button>
+              <button class="btn-primary-action font-bold" id="btnApplyWatermark">✓ Áp dụng kết quả</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -556,7 +626,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=4.0"></script>
+  <script src="app.js?v=4.1"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

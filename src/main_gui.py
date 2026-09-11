@@ -764,7 +764,7 @@ class OmniImageStudioApp(ctk.CTk):
         self.slider_sharpen.grid(row=1, column=0, sticky="ew", pady=(2, 0))
 
     def _build_stego_card(self):
-        SectionHeader(self.sidebar_scroll, "🛡", "THỦY VÂN & XÓA LOGO").grid(
+        SectionHeader(self.sidebar_scroll, "🛡", "THỦY VÂN & XÓA VẬT THỂ").grid(
             row=6, column=0, padx=10, pady=(4, 4), sticky="ew")
 
         card = ctk.CTkFrame(
@@ -817,7 +817,7 @@ class OmniImageStudioApp(ctk.CTk):
         # Row 3: Logo Eraser Buttons (Visible inpainting + Hidden LSB sanitization)
         self.btn_erase_visible = ctk.CTkButton(
             card,
-            text="🎨  Xóa Logo Hiện", height=30, corner_radius=6,
+            text="🪄  Xóa Vật Thể", height=30, corner_radius=6,
             fg_color=("#FEF3C7", "#2D261E"),
             hover_color=("#FDE68A", "#3D3428"),
             font=ctk.CTkFont("Segoe UI", 11, "bold"),
@@ -2372,7 +2372,7 @@ class OmniImageStudioApp(ctk.CTk):
         orig_w, orig_h = orig_img.size
 
         dialog = ctk.CTkToplevel(self)
-        dialog.title(f"🎨  Studio Xóa Logo & Thủy Vân Hiện — {item['name']} ({orig_w}×{orig_h} px)")
+        dialog.title(f"🪄  Studio Xóa Vật Thể & Logo (Magic Inpainting) — {item['name']} ({orig_w}×{orig_h} px)")
 
         sw = dialog.winfo_screenwidth()
         sh = dialog.winfo_screenheight()
@@ -2401,14 +2401,14 @@ class OmniImageStudioApp(ctk.CTk):
         top_bar.grid_propagate(False)
 
         ctk.CTkLabel(
-            top_bar, text="🎨  Studio Xóa Logo & Watermark Hiện",
+            top_bar, text="🪄  Studio Xóa Vật Thể & Logo (Magic Inpainting)",
             font=ctk.CTkFont("Segoe UI", 14, "bold"),
             text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
         ).pack(side="left", padx=16)
 
         ctk.CTkLabel(
             top_bar,
-            text="💡 Tô cọ hoặc khoanh khung lên logo/chữ mờ cần xóa. Vùng vật thể chính bên ngoài được bảo vệ 100%.",
+            text="💡 Dùng cọ hoặc khung khoanh lên vật thể/logo cần xóa. Thuật toán Telea FMM sẽ tái tạo bề mặt tự nhiên.",
             font=ctk.CTkFont("Segoe UI", 11),
             text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
         ).pack(side="left", padx=8)
@@ -2687,7 +2687,7 @@ class OmniImageStudioApp(ctk.CTk):
 
         btn_run_inpaint = ctk.CTkButton(
             card_exec,
-            text="⚡   TẨY LOGO NGAY",
+            text="⚡   XÓA VẬT THỂ NGAY",
             height=40, corner_radius=8,
             font=ctk.CTkFont("Segoe UI", 12, "bold"),
             fg_color=WARNING, hover_color=WARNING_HOVER,
