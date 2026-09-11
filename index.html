@@ -1,296 +1,559 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OmniImage Studio — Canva Magic Cutout & Image Toolkit</title>
+  <title>OmniImage Studio — Công Cụ Xử Lý & Chuyển Đổi Ảnh Đa Năng</title>
   <!-- Google Fonts: Cormorant Garamond, Italianno & Plus Jakarta Sans -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Italianno&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,400&family=Italianno&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <meta name="theme-color" content="#8C6849">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%238C6849'/><text x='50%' y='68%' font-size='60' text-anchor='middle' fill='%23FAF7F2' font-family='Georgia'>✦</text></svg>">
   <link rel="stylesheet" href="style.css">
+  <!-- JSZip for multi-file batch downloads -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
-  <!-- Background subtle wavy patterns -->
-  <div class="bg-waves"></div>
+  <!-- Hidden File Input for Image Selection -->
+  <input type="file" id="fileInput" multiple accept="image/*" style="display: none;">
+  <input type="file" id="logoInput" accept="image/*" style="display: none;">
 
-  <div class="page-wrapper">
-    <!-- Header matching reference image -->
-    <header class="poster-header">
-      <div class="star-accent">✦</div>
-      <p class="sub-heading">DESIGN WITH EMPATHY</p>
-      <h1 class="main-title">
-        <span class="serif-title">UI/UX</span>
-        <span class="script-title">Design</span>
-      </h1>
-      <div class="divider-line"></div>
-      <p class="tagline">CRAFTING DIGITAL EXPERIENCES THAT PEOPLE LOVE</p>
+  <!-- APP CONTAINER -->
+  <div class="app-layout">
+
+    <!-- ── 1. TOP HEADER ─────────────────────────────────────────── -->
+    <header class="app-header">
+      <div class="header-brand">
+        <span class="brand-star">✦</span>
+        <div class="brand-text">
+          <span class="brand-sub">D E S I G N   W I T H   E M P A T H Y</span>
+          <span class="brand-title">OmniImage Studio</span>
+        </div>
+        <div class="badge-pill">CANVA CUTOUT PRO</div>
+        <div class="swatch-strip" title="Aesthetic Color Palette">
+          <span class="swatch-dot" style="background:#FAF7F2;"></span>
+          <span class="swatch-dot" style="background:#E8E0D5;"></span>
+          <span class="swatch-dot" style="background:#BC9D82;"></span>
+          <span class="swatch-dot" style="background:#2C2B2A;"></span>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <span class="file-count-label" id="lblFileCount">Chưa có ảnh</span>
+        <button class="btn-theme-toggle" id="btnThemeToggle" title="Chuyển chế độ Sáng / Tối">
+          <span id="themeIcon">🌙</span> <span id="themeText">Tối</span>
+        </button>
+      </div>
     </header>
 
-    <!-- Main 3-Column Showcase Layout -->
-    <main class="showcase-grid">
-      <!-- Left Column: UI Principles, Swatches & Flow -->
-      <aside class="side-col left-col">
-        <div class="principle-card">
-          <h3>UI is how it <em>looks</em>.</h3>
-          <p>Colors, typography, layout, and visuals that create the first impression.</p>
+    <!-- ── 2. MAIN BODY GRID (Sidebar + Main Panel) ───────────────── -->
+    <div class="app-body">
+
+      <!-- ── SIDEBAR (Fixed Width Controls) ─────────────────────── -->
+      <aside class="app-sidebar">
+        <!-- Quick Input Card -->
+        <div class="sidebar-quick-input">
+          <button class="btn-primary-action" id="btnSelectFiles">
+            <span>📂  Chọn File Ảnh…</span>
+          </button>
+          <button class="btn-secondary-action" id="btnPasteClipboard" title="Dán ảnh từ bộ nhớ tạm (Ctrl+V)">
+            <span>📋  Dán (Ctrl+V)</span>
+          </button>
         </div>
 
-        <!-- Color Swatch Palette Card (From Reference Image) -->
-        <div class="swatch-card" id="swatchCard">
-          <div class="swatch-strip">
-            <div class="swatch-pill" style="background-color: #FAF7F2;" title="Cream Ivory (#FAF7F2)" data-color="#FAF7F2"></div>
-            <div class="swatch-pill" style="background-color: #E8E0D5;" title="Warm Sand (#E8E0D5)" data-color="#E8E0D5"></div>
-            <div class="swatch-pill" style="background-color: #BC9D82;" title="Mocha Brown (#BC9D82)" data-color="#BC9D82"></div>
-            <div class="swatch-pill" style="background-color: #2C2B2A;" title="Deep Charcoal (#2C2B2A)" data-color="#2C2B2A"></div>
-          </div>
-          <span class="swatch-label">PALETTE</span>
-        </div>
+        <!-- Scrollable Cards Area -->
+        <div class="sidebar-scrollable">
 
-        <!-- User Flow Card (From Reference Image) -->
-        <div class="flow-card">
-          <div class="flow-header">
-            <span>User Flow</span>
-            <div class="flow-dots">•••</div>
+          <!-- Card: Format & Compression -->
+          <div class="section-header">
+            <span class="section-indicator" style="background:#8C6849;"></span>
+            <span class="section-title">🔄  ĐỊNH DẠNG & NÉN</span>
           </div>
-          <div class="flow-diagram">
-            <div class="flow-node active">
-              <span class="dot"></span>
+          <div class="tool-card">
+            <div class="segmented-ctrl" id="segFormat">
+              <button class="seg-btn active" data-val="WEBP">WEBP</button>
+              <button class="seg-btn" data-val="PNG">PNG</button>
+              <button class="seg-btn" data-val="JPG">JPG</button>
+              <button class="seg-btn" data-val="ICO">ICO</button>
+              <button class="seg-btn" data-val="PDF">PDF</button>
             </div>
-            <div class="flow-arrow">→</div>
-            <div class="flow-node">
-              <span class="box"></span>
-            </div>
-            <div class="flow-arrow">→</div>
-            <div class="flow-node">
-              <span class="ring"></span>
-            </div>
-          </div>
-        </div>
-      </aside>
 
-      <!-- Center Column: Floating Phone Mockup & Canva Studio Canvas -->
-      <section class="phone-mockup-wrap">
-        <div class="phone-frame">
-          <div class="phone-speaker"></div>
-          
-          <div class="phone-screen">
-            <!-- App Header Inside Phone -->
-            <div class="app-header">
-              <div class="user-greeting">
-                <span class="greeting-sub">Good morning,</span>
-                <span class="user-name">Aisha 👋</span>
+            <div class="form-row mt-2">
+              <label class="form-label">Định dạng khác:</label>
+              <select class="custom-select" id="selExtraFormat">
+                <option value="">── Chọn khác ──</option>
+                <option value="BMP">BMP</option>
+                <option value="GIF">GIF</option>
+                <option value="TIFF">TIFF</option>
+              </select>
+            </div>
+
+            <div class="slider-box mt-2" id="qualityBox">
+              <div class="slider-header">
+                <span class="form-label">Chất lượng ảnh xuất</span>
+                <span class="val-badge text-accent" id="lblQuality">90%</span>
               </div>
-              <div class="avatar-circle">
-                <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" alt="Avatar">
+              <input type="range" id="sliderQuality" min="10" max="100" value="90" class="custom-slider accent-slider">
+            </div>
+          </div>
+
+          <!-- Card: Resize & Frame Presets -->
+          <div class="section-header mt-3">
+            <span class="section-indicator" style="background:#8C6849;"></span>
+            <span class="section-title">📐  KÍCH THƯỚC & KHUNG HÌNH</span>
+          </div>
+          <div class="tool-card">
+            <select class="custom-select" id="selPreset">
+              <option value="">── Chọn kích thước mẫu ──</option>
+              <optgroup label="Mạng xã hội">
+                <option value="820x312">Facebook Cover (820 × 312)</option>
+                <option value="1200x630">Facebook Post (1200 × 630)</option>
+                <option value="1080x1080">Instagram Vuông 1:1 (1080 × 1080)</option>
+                <option value="1080x1920">Instagram Story (1080 × 1920)</option>
+                <option value="1200x675">Twitter / X Post (1200 × 675)</option>
+                <option value="1280x720">YouTube Thumbnail (1280 × 720)</option>
+                <option value="2560x1440">YouTube Banner (2560 × 1440)</option>
+                <option value="1080x1920">TikTok Video (1080 × 1920)</option>
+              </optgroup>
+              <optgroup label="Màn hình & Đồ họa">
+                <option value="3840x2160">4K Ultra HD (3840 × 2160)</option>
+                <option value="1920x1080">Full HD 1080p (1920 × 1080)</option>
+                <option value="1280x720">HD 720p (1280 × 720)</option>
+              </optgroup>
+              <optgroup label="Biểu tượng & Icons">
+                <option value="32x32">Favicon Web (32 × 32)</option>
+                <option value="48x48">Windows Icon (48 × 48)</option>
+                <option value="128x128">App Icon Standard (128 × 128)</option>
+                <option value="256x256">High-Res Icon (256 × 256)</option>
+                <option value="512x512">App Store (512 × 512)</option>
+              </optgroup>
+            </select>
+
+            <div class="dim-inputs-row mt-2">
+              <input type="number" id="inputWidth" placeholder="Rộng (px)" class="custom-input" min="1">
+              <span class="dim-cross">×</span>
+              <input type="number" id="inputHeight" placeholder="Cao (px)" class="custom-input" min="1">
+            </div>
+
+            <label class="custom-checkbox-row mt-2">
+              <input type="checkbox" id="chkLockAspect" checked>
+              <span class="checkbox-box"></span>
+              <span class="checkbox-text">🔗  Khóa tỉ lệ khung hình</span>
+            </label>
+
+            <div class="form-row mt-2">
+              <label class="form-label">Chế độ vừa khung:</label>
+              <select class="custom-select" id="selFitMode">
+                <option value="stretch">Kéo dãn (stretch)</option>
+                <option value="contain">Vừa khung (contain)</option>
+                <option value="cover">Lấp đầy (cover)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Card: Canva Cutout & Sharpen -->
+          <div class="section-header mt-3">
+            <span class="section-indicator" style="background:#8C6849;"></span>
+            <span class="section-title">✨  TÁCH NỀN CHUẨN CANVA & LÀM NÉT</span>
+          </div>
+          <div class="tool-card">
+            <!-- Switch -->
+            <label class="custom-switch-row">
+              <input type="checkbox" id="swCutout">
+              <span class="switch-track"></span>
+              <span class="switch-label">✨  Tách nền thông minh (Canva Cutout)</span>
+            </label>
+
+            <button class="btn-studio-open mt-2" id="btnOpenCanvaStudio">
+              <span>🎨  Mở Canva Background Studio…</span>
+            </button>
+
+            <!-- Quick Background Selector -->
+            <div class="form-row mt-2">
+              <label class="form-label">Phông nền:</label>
+              <div class="segmented-ctrl flex-1" id="segBgMode">
+                <button class="seg-btn active" data-val="transparent">Trong suốt</button>
+                <button class="seg-btn" data-val="#FFFFFF">Trắng</button>
+                <button class="seg-btn" data-val="#F8F5F0">Kem be</button>
+                <button class="seg-btn" data-val="#1E1B18">Đen</button>
               </div>
             </div>
 
-            <!-- Canva Studio Interactive Card (Floating inside phone) -->
-            <div class="phone-card-hero">
-              <div class="card-hero-content">
-                <span class="hero-badge">CANVA CUTOUT STUDIO</span>
-                <h4 class="hero-title">EXPLORE NEW VISUALS</h4>
-                <p class="hero-desc">Tách nền 1-chạm & thiết kế phông nền đỉnh cao</p>
-                <button class="btn-hero-action" id="btnTriggerUpload">
-                  <span>Tải ảnh lên</span>
-                  <input type="file" id="fileInput" accept="image/*" style="display:none;">
-                </button>
-              </div>
-            </div>
-
-            <!-- Upload Dropzone / Canvas Display Area -->
-            <div class="canvas-display-box" id="dropZone">
-              <div class="drop-placeholder" id="dropPlaceholder">
-                <div class="upload-icon">✦</div>
-                <p class="drop-title">Kéo thả ảnh vào đây</p>
-                <p class="drop-sub">hoặc nhấp để chọn tệp (PNG, JPG, WEBP)</p>
-              </div>
-
-              <div class="canvas-container" id="canvasContainer" style="display: none;">
-                <!-- Result Canvas with Transparency Checkerboard -->
-                <canvas id="mainCanvas"></canvas>
-
-                <!-- Comparison Split Slider Indicator -->
-                <div class="split-slider-wrap" id="sliderWrap" style="display:none;">
-                  <button class="btn-compare" id="btnHoldCompare">👁 Giữ xem ảnh gốc</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Category Pills (From Reference Image) -->
-            <div class="category-section">
-              <div class="section-title-row">
-                <span class="section-title">Categories</span>
-                <span class="section-link">See all</span>
-              </div>
-              <div class="category-grid">
-                <div class="cat-pill active" data-preset="portrait">
-                  <div class="cat-icon">👤</div>
-                  <span>Chân dung</span>
-                </div>
-                <div class="cat-pill" data-preset="product">
-                  <div class="cat-icon">📦</div>
-                  <span>Sản phẩm</span>
-                </div>
-                <div class="cat-pill" data-preset="graphic">
-                  <div class="cat-icon">🎨</div>
-                  <span>Đồ họa</span>
-                </div>
-                <div class="cat-pill" data-preset="scenery">
-                  <div class="cat-icon">🌿</div>
-                  <span>Phong cảnh</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Bottom Phone Nav Bar -->
-            <div class="phone-bottom-nav">
-              <div class="nav-btn active">⌂</div>
-              <div class="nav-btn">♡</div>
-              <div class="nav-btn btn-nav-plus">+</div>
-              <div class="nav-btn">💬</div>
-              <div class="nav-btn">👤</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Right Column: Focus Badge, UX Principles & Canva Control Center -->
-      <aside class="side-col right-col">
-        <!-- Circular Focus Badge (From Reference Image) -->
-        <div class="focus-badge-circle">
-          <div class="focus-star">✦</div>
-          <div class="focus-title">FOCUS</div>
-          <div class="focus-tags">
-            <span>USER RESEARCH</span>
-            <span>WIREFRAME</span>
-            <span>TESTING</span>
-          </div>
-        </div>
-
-        <div class="principle-card">
-          <h3>UX is how it <em>works</em>.</h3>
-          <p>Flow, structure, and interaction that create real value.</p>
-        </div>
-
-        <!-- User Satisfaction Gauge Card (From Reference Image) -->
-        <div class="satisfaction-card">
-          <div class="sat-header">User Satisfaction</div>
-          <div class="sat-circle-gauge">
-            <svg viewBox="0 0 36 36" class="circular-chart">
-              <path class="circle-bg"
-                d="M18 2.0845
-                  a 15.9155 15.9155 0 0 1 0 31.831
-                  a 15.9155 15.9155 0 0 1 0 -31.831"
-              />
-              <path class="circle-fill"
-                stroke-dasharray="98, 100"
-                d="M18 2.0845
-                  a 15.9155 15.9155 0 0 1 0 31.831
-                  a 15.9155 15.9155 0 0 1 0 -31.831"
-              />
-            </svg>
-            <span class="sat-percent">98%</span>
-          </div>
-          <div class="sat-footer">Great Experience!</div>
-        </div>
-
-        <!-- Canva Studio Real-time Controls -->
-        <div class="canva-control-panel">
-          <h4 class="panel-heading">⚡ CÔNG CỤ CANVA</h4>
-
-          <!-- Background Cutout Toggle -->
-          <div class="ctrl-group">
-            <label class="ctrl-label">Tách nền thông minh</label>
-            <div class="segmented-ctrl" id="cutoutModeSeg">
-              <button class="seg-btn active" data-val="on">Bật (Cutout)</button>
-              <button class="seg-btn" data-val="off">Tắt</button>
-            </div>
-          </div>
-
-          <!-- Background Replacement -->
-          <div class="ctrl-group">
-            <label class="ctrl-label">Phông nền thay thế</label>
-            <div class="segmented-ctrl" id="bgModeSeg">
-              <button class="seg-btn active" data-val="transparent">Trong suốt</button>
-              <button class="seg-btn" data-val="color">Màu trơn</button>
-              <button class="seg-btn" data-val="blur">Mờ nền</button>
-            </div>
-          </div>
-
-          <!-- Color Swatches Row -->
-          <div class="ctrl-group color-select-row" id="colorSelectRow" style="display: none;">
-            <label class="ctrl-label">Màu phông nền:</label>
-            <div class="mini-swatches">
-              <button class="mini-swatch active" style="background:#FFFFFF;" data-color="#FFFFFF" title="Trắng"></button>
-              <button class="mini-swatch" style="background:#FAF7F2;" data-color="#FAF7F2" title="Kem be"></button>
-              <button class="mini-swatch" style="background:#2C2B2A;" data-color="#2C2B2A" title="Đen than"></button>
-              <button class="mini-swatch" style="background:#8C6849;" data-color="#8C6849" title="Mocha"></button>
-              <button class="mini-swatch" style="background:#5B7A58;" data-color="#5B7A58" title="Sage"></button>
-              <input type="color" id="customColorPicker" value="#FAF7F2" class="custom-color-input" title="Chọn màu bất kỳ">
-            </div>
-          </div>
-
-          <!-- Blur Slider -->
-          <div class="ctrl-group blur-slider-row" id="blurSliderRow" style="display: none;">
-            <div class="slider-header">
-              <span>Độ mờ hậu cảnh:</span>
-              <span id="blurVal">20px</span>
-            </div>
-            <input type="range" id="blurRange" min="2" max="50" value="20">
-          </div>
-
-          <!-- Canva Photo Effects: Drop Shadow & Glow Outline -->
-          <div class="ctrl-group">
-            <label class="ctrl-label">Hiệu ứng đồ họa</label>
-            <div class="checkbox-row">
-              <label class="custom-checkbox">
+            <!-- Canva Effects Checkboxes -->
+            <div class="checkbox-grid mt-2">
+              <label class="custom-checkbox-row">
                 <input type="checkbox" id="chkShadow">
-                <span>Đổ bóng mềm (Shadow)</span>
+                <span class="checkbox-box"></span>
+                <span class="checkbox-text">Đổ bóng (Shadow)</span>
               </label>
-              <label class="custom-checkbox">
+              <label class="custom-checkbox-row">
                 <input type="checkbox" id="chkGlow">
-                <span>Viền sáng (Glow)</span>
+                <span class="checkbox-box"></span>
+                <span class="checkbox-text">Viền nét (Outline)</span>
               </label>
             </div>
-          </div>
 
-          <!-- Format Selector & Download Button -->
-          <div class="ctrl-group">
-            <label class="ctrl-label">Định dạng xuất:</label>
-            <div class="segmented-ctrl" id="formatSeg">
-              <button class="seg-btn active" data-fmt="PNG">PNG</button>
-              <button class="seg-btn" data-fmt="WEBP">WEBP</button>
-              <button class="seg-btn" data-fmt="JPG">JPG</button>
+            <!-- Tolerance Slider -->
+            <div class="slider-box mt-2">
+              <div class="slider-header">
+                <span class="form-label">Độ nhạy tách nền</span>
+                <span class="val-badge text-accent" id="lblTolerance">35%</span>
+              </div>
+              <input type="range" id="sliderTolerance" min="5" max="80" value="35" class="custom-slider accent-slider">
+            </div>
+
+            <!-- Sharpen Slider -->
+            <div class="slider-box mt-2">
+              <div class="slider-header">
+                <span class="form-label">Tăng độ nét Unsharp Mask</span>
+                <span class="val-badge text-success" id="lblSharpen">0%</span>
+              </div>
+              <input type="range" id="sliderSharpen" min="0" max="100" value="0" class="custom-slider success-slider">
             </div>
           </div>
 
-          <button class="btn-download-primary" id="btnDownload">
-            <span>⚡ Tải ảnh xuống</span>
+          <!-- Card: Steganography & Logo Eraser -->
+          <div class="section-header mt-3">
+            <span class="section-indicator" style="background:#8C6849;"></span>
+            <span class="section-title">🛡  THỦY VÂN & XÓA LOGO</span>
+          </div>
+          <div class="tool-card">
+            <div class="btn-duo-row">
+              <button class="btn-sub-action" id="btnSelectLogo" title="Nhúng văn bản hoặc logo bản quyền ẩn">
+                🛡  Nhúng Logo…
+              </button>
+              <button class="btn-accent-action" id="btnOpenStegoInspector" title="Soi bitplane tìm dữ liệu ẩn">
+                🔍  Soi Logo Ẩn
+              </button>
+            </div>
+
+            <div class="logo-info-text mt-1" id="lblLogoInfo">Chưa chọn logo nhúng</div>
+
+            <div class="divider-line my-2"></div>
+
+            <div class="btn-duo-row">
+              <button class="btn-warning-action" id="btnOpenWatermarkStudio" title="Tô cọ xóa watermark trực tiếp">
+                🎨  Xóa Logo Hiện
+              </button>
+              <button class="btn-sub-action" id="btnQuickSanitize" title="Tẩy sạch thông tin ẩn trong bitplane">
+                🧹  Tẩy Logo Ẩn
+              </button>
+            </div>
+
+            <label class="custom-checkbox-row mt-2">
+              <input type="checkbox" id="chkCleanStego">
+              <span class="checkbox-box"></span>
+              <span class="checkbox-text">🧹  Làm sạch logo ẩn khi xuất</span>
+            </label>
+          </div>
+
+        </div>
+
+        <!-- Pinned Bottom Actions Bar -->
+        <div class="sidebar-pinned-bottom">
+          <button class="btn-start-convert" id="btnStartBatch">
+            ⚡   BẮT ĐẦU CHUYỂN ĐỔI
+          </button>
+          <button class="btn-clear-queue" id="btnClearAll">
+            🗑  Làm trống danh sách
           </button>
         </div>
       </aside>
-    </main>
 
-    <!-- Poster Bottom Quote & Social Icons (From Reference Image) -->
-    <footer class="poster-footer">
-      <p class="quote-text">
-        GOOD DESIGN IS INVISIBLE, <br>
-        <em>but the experience is unforgettable.</em>
-      </p>
-      <div class="social-icons">
-        <span class="s-icon">♡</span>
-        <span class="s-icon">💬</span>
-        <span class="s-icon">✈</span>
-        <span class="s-icon">🔖</span>
+      <!-- ── MAIN PANEL (Tabview + Comparison + Queue) ──────────── -->
+      <main class="app-main-panel">
+        
+        <!-- Tab Headers -->
+        <div class="tab-header-strip">
+          <button class="tab-btn active" id="tabBtnPreview" data-tab="tabPreview">
+            🖼  Xem Trước Trực Tiếp (Before/After)
+          </button>
+          <button class="tab-btn" id="tabBtnQueue" data-tab="tabQueue">
+            📑  Danh Sách Tệp Đang Xử Lý
+          </button>
+        </div>
+
+        <!-- Tab 1: Live Preview Before / After -->
+        <div class="tab-content active" id="tabPreview">
+          <!-- Top Sub-Toolbar Inside Preview -->
+          <div class="preview-nav-bar">
+            <div class="nav-btn-group">
+              <button class="btn-nav-arrow" id="btnPrevImg">◀ Trước</button>
+              <span class="nav-index-badge" id="lblImgIndex">Ảnh 0/0</span>
+              <button class="btn-nav-arrow" id="btnNextImg">Tiếp ▶</button>
+            </div>
+            <span class="current-filename" id="lblCurrentFilename">Chưa nạp ảnh nào</span>
+
+            <div class="nav-tools-right">
+              <button class="btn-nav-tool btn-nav-canva" id="btnNavCanva">✨  Canva Studio</button>
+              <button class="btn-nav-tool btn-nav-erase" id="btnNavErase">🎨  Xóa Logo Hiện</button>
+              <button class="btn-nav-tool btn-nav-clean" id="btnNavClean">🧹  Tẩy Logo Ẩn</button>
+            </div>
+          </div>
+
+          <!-- Side-by-Side Comparison Panes -->
+          <div class="comparison-grid">
+            <!-- Left Pane: Original -->
+            <div class="compare-pane pane-orig" id="paneOrigDrop">
+              <div class="pane-hdr">
+                <span class="pane-title">ẢNH GỐC (ORIGINAL)</span>
+                <span class="pane-badge" id="badgeOrig">—</span>
+              </div>
+              <div class="pane-canvas-box" id="origBox">
+                <div class="pane-placeholder" id="placeholderOrig">
+                  <span class="placeholder-icon">📂</span>
+                  <p class="placeholder-title">Kéo thả ảnh vào đây</p>
+                  <p class="placeholder-sub">hoặc bấm 'Chọn File Ảnh' để bắt đầu</p>
+                </div>
+                <img id="imgOrig" alt="Original Preview" class="preview-img" style="display: none;">
+              </div>
+            </div>
+
+            <!-- Right Pane: Live Processed Preview -->
+            <div class="compare-pane pane-proc">
+              <div class="pane-hdr">
+                <span class="pane-title text-accent">KẾT QUẢ XỬ LÝ (LIVE PREVIEW)</span>
+                <div class="pane-actions">
+                  <span class="pane-badge text-accent" id="badgeProc">—</span>
+                  <button class="btn-pane-download" id="btnDownloadCurrent" title="Tải nhanh ảnh này xuống" style="display:none;">
+                    ⬇ Tải ảnh
+                  </button>
+                </div>
+              </div>
+              <div class="pane-canvas-box checker-bg" id="procBox">
+                <div class="pane-placeholder" id="placeholderProc">
+                  <span class="placeholder-icon">✨</span>
+                  <p class="placeholder-title">Xem trước trực quan</p>
+                  <p class="placeholder-sub">kết quả sau khi chuyển đổi & tách nền</p>
+                </div>
+                <canvas id="canvasPreview" class="preview-canvas" style="display: none;"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Queue Table -->
+        <div class="tab-content" id="tabQueue" style="display: none;">
+          <!-- Queue Stats Bar -->
+          <div class="queue-stats-bar">
+            <span id="lblQueueStats">Tổng số: 0 ảnh  •  Hoàn tất: 0  •  Đang chờ: 0</span>
+            <button class="btn-download-all" id="btnDownloadAllZip" style="display: none;">
+              📦 Tải Tất Cả (.ZIP)
+            </button>
+          </div>
+
+          <!-- Scrollable Queue Cards List -->
+          <div class="queue-cards-list" id="queueCardsContainer">
+            <div class="queue-empty-notice">
+              <span>📑</span>
+              <p>Chưa có ảnh nào trong danh sách. Hãy thêm ảnh để xử lý hàng loạt!</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Status Bar -->
+        <footer class="app-status-bar">
+          <span class="status-msg" id="lblStatus">Sẵn sàng  •  Kéo thả ảnh vào khung hoặc bấm 'Chọn File Ảnh' để bắt đầu</span>
+          <div class="progress-wrap">
+            <div class="progress-bar-inner" id="progressBar" style="width: 0%;"></div>
+          </div>
+        </footer>
+
+      </main>
+
+    </div>
+
+  </div>
+
+  <!-- ── 3. MODAL: CANVA BACKGROUND STUDIO ──────────────────────── -->
+  <div class="modal-backdrop" id="modalCanvaStudio" style="display: none;">
+    <div class="modal-dialog modal-studio-dialog">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-icon text-accent">✦</span>
+          <span class="modal-title">CANVA BACKGROUND STUDIO — CHỈNH SỬA PHÔNG NỀN CHUYÊN NGHIỆP</span>
+        </div>
+        <button class="modal-close-btn" id="btnCloseCanvaStudio">✕</button>
       </div>
-    </footer>
+
+      <div class="modal-body-studio">
+        <!-- Left: Large Retouch Canvas Area -->
+        <div class="studio-left-canvas">
+          <!-- Canvas Top Toolbar -->
+          <div class="studio-top-bar">
+            <button class="btn-sub-action" id="btnStudioCompare">👁 Giữ xem ảnh gốc</button>
+            <div class="v-divider"></div>
+            <span class="form-label">Cọ vẽ:</span>
+            <div class="segmented-ctrl" id="segRetouchTool">
+              <button class="seg-btn active" data-tool="view">Xem ảnh</button>
+              <button class="seg-btn" data-tool="erase">🧹 Cọ xóa</button>
+              <button class="seg-btn" data-tool="restore">🖌 Cọ khôi phục</button>
+            </div>
+            <span class="form-label ml-2">Cỡ:</span>
+            <span class="val-badge text-accent" id="lblBrushSize">25px</span>
+            <input type="range" id="sliderBrushSize" min="5" max="80" value="25" class="custom-slider brush-slider">
+            <button class="btn-sub-action ml-auto" id="btnStudioUndo">↺ Hoàn tác</button>
+          </div>
+
+          <div class="studio-canvas-stage checker-bg">
+            <canvas id="studioCanvas"></canvas>
+          </div>
+        </div>
+
+        <!-- Right: Settings Panel -->
+        <div class="studio-right-panel">
+          <!-- Section 1: Magic Cutout -->
+          <div class="section-header">
+            <span class="section-indicator" style="background:#8C6849;"></span>
+            <span class="section-title">✨  TÁCH NỀN THÔNG MINH</span>
+          </div>
+          <div class="tool-card">
+            <div class="segmented-ctrl" id="segStudioMethod">
+              <button class="seg-btn active" data-method="smart">Tự động (AI)</button>
+              <button class="seg-btn" data-method="color">Đồng màu</button>
+              <button class="seg-btn" data-method="grabcut">Chi tiết</button>
+            </div>
+            <button class="btn-success-action mt-2" id="btnStudioRunCutout">
+              ⚡  Tách Nền Tự Động (Canva Cutout)
+            </button>
+          </div>
+
+          <!-- Section 2: Background Replacement -->
+          <div class="section-header mt-3">
+            <span class="section-indicator" style="background:#8C6849;"></span>
+            <span class="section-title">🎨  THAY ĐỔI PHÔNG NỀN</span>
+          </div>
+          <div class="tool-card">
+            <div class="segmented-ctrl" id="segStudioBgType">
+              <button class="seg-btn active" data-bg="transparent">Trong suốt</button>
+              <button class="seg-btn" data-bg="color">Màu trơn</button>
+              <button class="seg-btn" data-bg="blur">Mờ nền</button>
+            </div>
+
+            <!-- Color Palette Row -->
+            <div class="palette-swatches-row mt-2">
+              <button class="palette-swatch" style="background:#FFFFFF;" data-color="#FFFFFF" title="Trắng"></button>
+              <button class="palette-swatch" style="background:#FAF7F2;" data-color="#FAF7F2" title="Kem be"></button>
+              <button class="palette-swatch" style="background:#2C2B2A;" data-color="#2C2B2A" title="Đen"></button>
+              <button class="palette-swatch" style="background:#8C6849;" data-color="#8C6849" title="Mocha"></button>
+              <button class="palette-swatch" style="background:#5B7A58;" data-color="#5B7A58" title="Sage"></button>
+              <button class="palette-swatch" style="background:#E2D7C8;" data-color="#E2D7C8" title="Sand"></button>
+              <input type="color" id="studioColorPicker" value="#FAF7F2" class="custom-color-input" title="Chọn màu bất kỳ">
+            </div>
+
+            <!-- Blur Slider -->
+            <div class="slider-box mt-2" id="studioBlurBox">
+              <div class="slider-header">
+                <span class="form-label">Độ mờ hậu cảnh (Bokeh Blur):</span>
+                <span class="val-badge text-accent" id="lblStudioBlur">25px</span>
+              </div>
+              <input type="range" id="sliderStudioBlur" min="2" max="60" value="25" class="custom-slider accent-slider">
+            </div>
+          </div>
+
+          <!-- Section 3: Graphic Photo Effects -->
+          <div class="section-header mt-3">
+            <span class="section-indicator" style="background:#8C6849;"></span>
+            <span class="section-title">🪄  HIỆU ỨNG ĐỒ HỌA CANVA</span>
+          </div>
+          <div class="tool-card">
+            <label class="custom-checkbox-row">
+              <input type="checkbox" id="chkStudioShadow">
+              <span class="checkbox-box"></span>
+              <span class="checkbox-text">Đổ bóng mềm (Canva Shadow)</span>
+            </label>
+
+            <label class="custom-checkbox-row mt-2">
+              <input type="checkbox" id="chkStudioGlow">
+              <span class="checkbox-box"></span>
+              <span class="checkbox-text">Viền sáng / Nét bao quanh (Outline)</span>
+            </label>
+          </div>
+
+          <!-- Studio Modal Actions -->
+          <div class="studio-bottom-actions mt-auto">
+            <button class="btn-primary-action" id="btnStudioApply">
+              ✓ Áp dụng kết quả
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 4. MODAL: WATERMARK / LOGO ERASER STUDIO ───────────────── -->
+  <div class="modal-backdrop" id="modalWatermarkStudio" style="display: none;">
+    <div class="modal-dialog modal-watermark-dialog">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-icon text-warning">🎨</span>
+          <span class="modal-title">STUDIO XÓA LOGO & THỦY VÂN (OBJECT INPAINTING)</span>
+        </div>
+        <button class="modal-close-btn" id="btnCloseWatermarkStudio">✕</button>
+      </div>
+
+      <div class="modal-body-watermark">
+        <div class="watermark-canvas-stage">
+          <div class="watermark-top-bar">
+            <span class="form-label">Tô đỏ vùng logo / chữ cần xóa:</span>
+            <span class="form-label ml-auto">Cỡ cọ:</span>
+            <span class="val-badge text-accent" id="lblInpaintBrushSize">20px</span>
+            <input type="range" id="sliderInpaintBrush" min="5" max="60" value="20" class="custom-slider brush-slider">
+            <button class="btn-sub-action ml-2" id="btnInpaintClearMask">🧹 Xóa vùng chọn</button>
+            <button class="btn-warning-action ml-2" id="btnRunInpaint">⚡ Bắt đầu xóa</button>
+          </div>
+
+          <div class="inpaint-canvas-wrap">
+            <canvas id="inpaintCanvas"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-sub-action" id="btnCancelWatermark">Hủy</button>
+        <button class="btn-primary-action" id="btnApplyWatermark">✓ Lưu kết quả</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 5. MODAL: STEGANOGRAPHY BITPLANE INSPECTOR ─────────────── -->
+  <div class="modal-backdrop" id="modalStegoInspector" style="display: none;">
+    <div class="modal-dialog modal-stego-dialog">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-icon text-accent">🔍</span>
+          <span class="modal-title">SOI LOGO ẨN — BIT-PLANE STEGANOGRAPHY INSPECTOR</span>
+        </div>
+        <button class="modal-close-btn" id="btnCloseStegoInspector">✕</button>
+      </div>
+
+      <div class="modal-body-stego">
+        <div class="stego-controls-row">
+          <label class="form-label">Chọn lớp bit (Bit-Plane):</label>
+          <div class="segmented-ctrl" id="segBitPlane">
+            <button class="seg-btn active" data-bit="0">Bit 0 (Ẩn sâu nhất)</button>
+            <button class="seg-btn" data-bit="1">Bit 1</button>
+            <button class="seg-btn" data-bit="2">Bit 2</button>
+            <button class="seg-btn" data-bit="7">Bit 7 (Ảnh thường)</button>
+          </div>
+          <label class="form-label ml-2">Kênh màu:</label>
+          <select class="custom-select" id="selStegoChannel" style="width: 110px;">
+            <option value="all">Tất cả RGB</option>
+            <option value="red">Kênh Đỏ (R)</option>
+            <option value="green">Kênh Xanh (G)</option>
+            <option value="blue">Kênh Lam (B)</option>
+          </select>
+        </div>
+
+        <div class="stego-canvas-wrap checker-bg mt-2">
+          <canvas id="stegoCanvas"></canvas>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>
@@ -303,4 +566,3 @@
   </script>
 </body>
 </html>
-
