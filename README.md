@@ -47,13 +47,32 @@ Bộ công cụ xử lý, chuyển đổi định dạng và tách nền ảnh c
    python src/main_gui.py
    ```
 
-### B. Chạy Ứng Dụng Trên Trình Duyệt (Web App)
-1. **Mở trực tiếp**: Mở tệp `web/index.html` hoặc `index.html` trong bất kỳ trình duyệt nào (Chrome, Edge, Safari, Firefox).
-2. **Khởi chạy Local Server**:
-   ```bash
-   python web/server.py
-   ```
-   Trình duyệt sẽ tự động mở địa chỉ: `http://localhost:8080`.
+### B. Chạy Ứng Dụng Trên Web (Truy Cập Ở Bất Cứ Đâu)
+
+#### 1. 🌐 Truy cập Online miễn phí 24/7 (GitHub Pages):
+Ứng dụng đã sẵn sàng chạy trực tiếp trên web mà không cần cài đặt gì:
+👉 **[https://ddtam2604work.github.io/convert_image/](https://ddtam2604work.github.io/convert_image/)**
+
+*(Để kích hoạt nếu chưa bật: Vào repo **Settings** ➔ **Pages** ➔ **Build and deployment** ➔ Chọn **Deploy from a branch** (nhánh `main`, thư mục `/root`) hoặc chọn **GitHub Actions**).*
+
+#### 2. 📱 Truy cập từ điện thoại / iPad trong cùng mạng Wi-Fi:
+Khởi chạy máy chủ nội bộ:
+```bash
+python server.py
+```
+Màn hình console sẽ hiển thị địa chỉ IP cục bộ, ví dụ:
+- Máy tính: `http://localhost:8080`
+- Điện thoại / iPad trong cùng Wi-Fi: `http://192.168.40.123:8080`
+
+#### 3. 📲 Cài đặt thành App trên điện thoại (PWA):
+Ứng dụng đã tích hợp **Progressive Web App (PWA)**:
+- Mở link trên Safari (iOS) hoặc Chrome (Android).
+- Chọn **"Thêm vào Màn hình chính"** (*Add to Home Screen*).
+- Ứng dụng sẽ hoạt động mượt mà như một app độc lập trên điện thoại ngay cả khi mất mạng.
+
+#### 4. 🚀 Triển khai 1-click lên Vercel / Netlify:
+Đã tích hợp sẵn file cấu hình `vercel.json` và `netlify.toml`:
+- Kết nối kho lưu trữ với [Vercel](https://vercel.com) hoặc [Netlify](https://netlify.com) để có tên miền riêng và CDN toàn cầu.
 
 ---
 
@@ -61,19 +80,24 @@ Bộ công cụ xử lý, chuyển đổi định dạng và tách nền ảnh c
 
 ```text
 convert_image/
-├── OmniImageStudio.exe      # File thực thi Windows độc lập
-├── index.html              # Trang chuyển hướng Web App cho GitHub Pages
-├── web/                    # Ứng dụng Web Canva Cutout Studio
-│   ├── index.html          # Giao diện Web phong cách Warm Editorial
-│   ├── style.css           # Hệ thống CSS Neomorphic & Phone Mockup
-│   ├── app.js              # Engine xử lý Canvas client-side
-│   └── server.py           # Local HTTP Server
+├── OmniImageStudio.exe      # File thực thi Windows độc lập (75 MB)
+├── index.html              # Web App chính (chạy trực tiếp trên GitHub Pages)
+├── style.css               # Phong cách Warm Editorial & Responsive Phone Mockup
+├── app.js                  # Engine xử lý Canvas client-side
+├── manifest.json           # Cấu hình PWA (cài app trên điện thoại)
+├── sw.js                   # Service Worker hỗ trợ offline & tải nhanh
+├── server.py               # Máy chủ HTTP hỗ trợ chia sẻ qua mạng Wi-Fi
+├── vercel.json             # Cấu hình triển khai Vercel
+├── netlify.toml            # Cấu hình triển khai Netlify
+├── .github/workflows/      # Tự động hóa triển khai GitHub Pages (deploy.yml)
+├── web/                    # Thư mục web độc lập
 ├── src/
 │   ├── core_engine.py      # Bộ xử lý ảnh nền tảng (Pillow, OpenCV, GrabCut)
 │   └── main_gui.py         # Giao diện Desktop CustomTkinter Warm Cream & Mocha
-└── samples/                # Ảnh mẫu thử nghiệm (flower.png, cityscape.jpg)
+└── samples/                # Ảnh mẫu thử nghiệm
 ```
 
 ---
 
 *Thiết kế và phát triển bởi [ddtam2604work](https://github.com/ddtam2604work).*
+
