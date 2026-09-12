@@ -203,6 +203,7 @@ class NativeImageEngine:
         Canva Background Replacer:
         - 'transparent': Clean RGBA cutout
         - 'color': Composite over solid color
+        - 'gradient': Composite over studio linear gradient or radial spotlight
         - 'blur': Bokeh blur original background while keeping foreground crisp
         - 'image': Composite over custom background image
         """
@@ -212,12 +213,55 @@ class NativeImageEngine:
         if bg_type == "transparent":
             return fg
 
+        # Check for gradient type or gradient color spec
+        is_gradient = (
+            bg_type == "gradient" or 
+            (isinstance(bg_color, str) and (bg_color.startswith("gradient:") or bg_color.startswith("radial:")))
+        )
+
+        if is_gradient:
+            grad_spec = bg_color if isinstance(bg_color, str) else "gradient:indigo_purple"
+            if grad_spec == "radial:spotlight":
+                # Studio Spotlight / Vignette: Soft white center fading to deep slate edge
+                x = np.linspace(-1, 1, w, dtype=np.float32)
+                y = np.linspace(-1, 1, h, dtype=np.float32)
+                xx, yy = np.meshgrid(x, y)
+                r = np.clip(np.sqrt(xx**2 + yy**2) / 1.35, 0.0, 1.0)
+                c_center = np.array([248, 250, 252], dtype=np.float32) # Slate-50
+                c_edge   = np.array([30, 41, 59], dtype=np.float32)    # Slate-800
+                arr = (1.0 - r)[:, :, np.newaxis] * c_center + r[:, :, np.newaxis] * c_edge
+                bg_canvas = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), "RGB").convert("RGBA")
+            else:
+                # Predefined linear gradient palettes
+                grad_palettes = {
+                    "gradient:indigo_purple": ("#4F46E5", "#9333EA"),
+                    "gradient:sunset": ("#F59E0B", "#EC4899"),
+                    "gradient:ocean": ("#06B6D4", "#3B82F6"),
+                    "gradient:deep_slate": ("#334155", "#0F172A"),
+                    "gradient:pastel_blush": ("#FBCFE8", "#E0E7FF")
+                }
+                c1_hex, c2_hex = grad_palettes.get(grad_spec, ("#4F46E5", "#9333EA"))
+                c1 = np.array([int(c1_hex[i:i+2], 16) for i in (1, 3, 5)], dtype=np.float32)
+                c2 = np.array([int(c2_hex[i:i+2], 16) for i in (1, 3, 5)], dtype=np.float32)
+
+                x = np.linspace(0, 1, w, dtype=np.float32)
+                y = np.linspace(0, 1, h, dtype=np.float32)
+                xx, yy = np.meshgrid(x, y)
+                t = np.clip((xx + yy) * 0.5, 0.0, 1.0)
+                arr = (1.0 - t)[:, :, np.newaxis] * c1 + t[:, :, np.newaxis] * c2
+                bg_canvas = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), "RGB").convert("RGBA")
+
+            bg_canvas.alpha_composite(fg)
+            return bg_canvas
+
         elif bg_type == "color":
             # Parse hex or tuple color
             if isinstance(bg_color, str):
                 hex_str = bg_color.lstrip("#")
                 if len(hex_str) == 6:
                     c_tuple = tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
+                elif len(hex_str) == 3:
+                    c_tuple = tuple(int(c * 2, 16) for c in hex_str)
                 else:
                     c_tuple = (255, 255, 255)
             else:

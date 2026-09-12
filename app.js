@@ -328,8 +328,40 @@
       el.segBgMode.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       state.config.canvaBgMode = btn.dataset.val;
+      if (btn.dataset.val !== 'transparent') {
+        state.config.cutoutEnabled = true;
+        el.swCutout.checked = true;
+      }
       renderCurrentPreview();
     });
+
+    // Sidebar swatches & gradients & color picker
+    document.querySelectorAll('.sidebar-swatch, .sidebar-grad-swatch').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const col = btn.dataset.color;
+        state.config.canvaBgMode = col;
+        state.config.cutoutEnabled = true;
+        el.swCutout.checked = true;
+        el.segBgMode.querySelectorAll('.seg-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.val === col);
+        });
+        renderCurrentPreview();
+      });
+    });
+
+    const sidePicker = document.getElementById('sideBgColorPicker');
+    if (sidePicker) {
+      sidePicker.addEventListener('input', (e) => {
+        const col = e.target.value.toUpperCase();
+        state.config.canvaBgMode = col;
+        state.config.cutoutEnabled = true;
+        el.swCutout.checked = true;
+        el.segBgMode.querySelectorAll('.seg-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.val === col);
+        });
+        renderCurrentPreview();
+      });
+    }
 
     // Canva effects checkboxes
     el.chkShadow.addEventListener('change', (e) => {
@@ -720,7 +752,8 @@
     const subCtx = subjectCanvas.getContext('2d', { willReadFrequently: true });
     subCtx.drawImage(item.img, 0, 0, origW, origH);
 
-    if (cfg.cutoutEnabled) {
+    const shouldCutout = cfg.cutoutEnabled || (cfg.canvaBgMode && cfg.canvaBgMode !== 'transparent');
+    if (shouldCutout) {
       // 1. Run Cutout Segmentation
       const imgData = subCtx.getImageData(0, 0, origW, origH);
       const data = imgData.data;
@@ -795,17 +828,47 @@
     }
 
     // Step C: Render Background
-    if (cfg.cutoutEnabled) {
-      if (cfg.canvaBgMode === 'transparent') {
+    if (shouldCutout) {
+      if (!cfg.canvaBgMode || cfg.canvaBgMode === 'transparent') {
         // Leave canvas transparent
-      } else if (cfg.canvaBgMode.startsWith('#')) {
-        ctx.fillStyle = cfg.canvaBgMode;
+      } else if (cfg.canvaBgMode === 'radial:spotlight') {
+        const radGrad = ctx.createRadialGradient(targetW / 2, targetH / 2, 0, targetW / 2, targetH / 2, Math.max(targetW, targetH) / 1.2);
+        radGrad.addColorStop(0, '#334155');
+        radGrad.addColorStop(1, '#0F172A');
+        ctx.fillStyle = radGrad;
+        ctx.fillRect(0, 0, targetW, targetH);
+      } else if (cfg.canvaBgMode === 'gradient:indigo_purple') {
+        const linGrad = ctx.createLinearGradient(0, 0, targetW, targetH);
+        linGrad.addColorStop(0, '#4F46E5');
+        linGrad.addColorStop(1, '#9333EA');
+        ctx.fillStyle = linGrad;
+        ctx.fillRect(0, 0, targetW, targetH);
+      } else if (cfg.canvaBgMode === 'gradient:sunset') {
+        const linGrad = ctx.createLinearGradient(0, 0, targetW, targetH);
+        linGrad.addColorStop(0, '#F59E0B');
+        linGrad.addColorStop(1, '#EC4899');
+        ctx.fillStyle = linGrad;
+        ctx.fillRect(0, 0, targetW, targetH);
+      } else if (cfg.canvaBgMode === 'gradient:ocean') {
+        const linGrad = ctx.createLinearGradient(0, 0, targetW, targetH);
+        linGrad.addColorStop(0, '#0284C7');
+        linGrad.addColorStop(1, '#0D9488');
+        ctx.fillStyle = linGrad;
+        ctx.fillRect(0, 0, targetW, targetH);
+      } else if (cfg.canvaBgMode === 'gradient:deep_slate') {
+        const linGrad = ctx.createLinearGradient(0, 0, targetW, targetH);
+        linGrad.addColorStop(0, '#334155');
+        linGrad.addColorStop(1, '#020617');
+        ctx.fillStyle = linGrad;
         ctx.fillRect(0, 0, targetW, targetH);
       } else if (cfg.canvaBgMode === 'blur') {
         ctx.save();
-        ctx.filter = `blur(${cfg.canvaBlurRadius}px)`;
+        ctx.filter = `blur(${cfg.canvaBlurRadius || 20}px)`;
         ctx.drawImage(item.img, drawX - 10, drawY - 10, drawW + 20, drawH + 20);
         ctx.restore();
+      } else if (cfg.canvaBgMode.startsWith('#') || cfg.canvaBgMode.startsWith('rgb')) {
+        ctx.fillStyle = cfg.canvaBgMode;
+        ctx.fillRect(0, 0, targetW, targetH);
       }
     } else {
       // Non-cutout: if contain mode, fill background with clean white or card bg
@@ -816,20 +879,20 @@
     }
 
     // Step D: Render Effects (Shadow & Glow) behind Subject
-    if (cfg.cutoutEnabled && cfg.shadowEnabled) {
+    if (shouldCutout && cfg.shadowEnabled) {
       ctx.save();
-      ctx.shadowColor = `rgba(0, 0, 0, ${cfg.shadowOpacity})`;
-      ctx.shadowBlur = cfg.shadowBlur;
+      ctx.shadowColor = `rgba(0, 0, 0, ${cfg.shadowOpacity || 0.45})`;
+      ctx.shadowBlur = cfg.shadowBlur || 16;
       ctx.shadowOffsetX = 10;
       ctx.shadowOffsetY = 12;
       ctx.drawImage(subjectCanvas, drawX, drawY, drawW, drawH);
       ctx.restore();
     }
 
-    if (cfg.cutoutEnabled && cfg.glowEnabled) {
+    if (shouldCutout && cfg.glowEnabled) {
       ctx.save();
-      ctx.shadowColor = cfg.glowColor;
-      ctx.shadowBlur = cfg.glowWidth * 2;
+      ctx.shadowColor = cfg.glowColor || '#FFFFFF';
+      ctx.shadowBlur = (cfg.glowWidth || 6) * 2;
       ctx.shadowOffsetX = 0;
       ctx.shadowOffsetY = 0;
       ctx.drawImage(subjectCanvas, drawX, drawY, drawW, drawH);
@@ -1085,6 +1148,24 @@
       mCtx.drawImage(item.customMask, 0, 0);
     }
 
+    // Sync current background setting into studio state
+    if (state.config.canvaBgMode === 'transparent' || state.config.canvaBgMode === 'blur') {
+      state.studio.bgType = state.config.canvaBgMode;
+    } else if (state.config.canvaBgMode.startsWith('gradient:') || state.config.canvaBgMode.startsWith('radial:')) {
+      state.studio.bgType = 'gradient';
+      state.studio.bgColor = state.config.canvaBgMode;
+    } else {
+      state.studio.bgType = 'color';
+      state.studio.bgColor = state.config.canvaBgMode;
+    }
+    el.segStudioBgType.querySelectorAll('.seg-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.bg === state.studio.bgType);
+    });
+    const hexInpInit = document.getElementById('studioHexInput');
+    if (hexInpInit && state.studio.bgColor && state.studio.bgColor.startsWith('#')) {
+      hexInpInit.value = state.studio.bgColor;
+    }
+
     state.studio.undoStack = [];
     pushStudioUndo();
     renderStudioDisplay();
@@ -1150,25 +1231,72 @@
       el.segStudioBgType.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       state.studio.bgType = btn.dataset.bg;
+      if (btn.dataset.bg === 'gradient') {
+        if (!state.studio.bgColor || (!state.studio.bgColor.startsWith('gradient:') && !state.studio.bgColor.startsWith('radial:'))) {
+          state.studio.bgColor = 'radial:spotlight';
+        }
+      }
       el.studioBlurBox.style.display = btn.dataset.bg === 'blur' ? 'block' : 'none';
       renderStudioDisplay();
     });
 
-    // Swatches
+    // Color Swatches
     document.querySelectorAll('.palette-swatch').forEach(sw => {
       sw.addEventListener('click', () => {
         state.studio.bgType = 'color';
         state.studio.bgColor = sw.dataset.color;
+        const hexInp = document.getElementById('studioHexInput');
+        if (hexInp) hexInp.value = sw.dataset.color;
         el.segStudioBgType.querySelectorAll('.seg-btn').forEach(b => {
           b.classList.toggle('active', b.dataset.bg === 'color');
         });
+        el.studioBlurBox.style.display = 'none';
         renderStudioDisplay();
       });
     });
 
+    // Gradient Presets
+    document.querySelectorAll('.palette-grad-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.studio.bgType = 'gradient';
+        state.studio.bgColor = btn.dataset.color;
+        el.segStudioBgType.querySelectorAll('.seg-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.bg === 'gradient');
+        });
+        el.studioBlurBox.style.display = 'none';
+        renderStudioDisplay();
+      });
+    });
+
+    // Hex Code Input & Apply
+    const hexInp = document.getElementById('studioHexInput');
+    const btnHex = document.getElementById('btnStudioApplyHex');
+    if (btnHex && hexInp) {
+      btnHex.addEventListener('click', () => {
+        let val = hexInp.value.trim();
+        if (val) {
+          if (!val.startsWith('#')) val = '#' + val;
+          val = val.toUpperCase();
+          state.studio.bgType = 'color';
+          state.studio.bgColor = val;
+          el.segStudioBgType.querySelectorAll('.seg-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.bg === 'color');
+          });
+          el.studioBlurBox.style.display = 'none';
+          renderStudioDisplay();
+        }
+      });
+    }
+
     el.studioColorPicker.addEventListener('input', (e) => {
+      const col = e.target.value.toUpperCase();
       state.studio.bgType = 'color';
-      state.studio.bgColor = e.target.value;
+      state.studio.bgColor = col;
+      if (hexInp) hexInp.value = col;
+      el.segStudioBgType.querySelectorAll('.seg-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.bg === 'color');
+      });
+      el.studioBlurBox.style.display = 'none';
       renderStudioDisplay();
     });
 
@@ -1209,11 +1337,15 @@
         state.config.cutoutEnabled = true;
         el.swCutout.checked = true;
 
-        if (state.studio.bgType === 'color') {
+        if (state.studio.bgType === 'color' || state.studio.bgType === 'gradient') {
           state.config.canvaBgMode = state.studio.bgColor;
         } else {
           state.config.canvaBgMode = state.studio.bgType;
         }
+        el.segBgMode.querySelectorAll('.seg-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.val === state.config.canvaBgMode);
+        });
+
         state.config.canvaBlurRadius = state.studio.blurRadius;
         state.config.shadowEnabled = state.studio.shadow;
         el.chkShadow.checked = state.studio.shadow;
@@ -1277,7 +1409,7 @@
 
     const studioCfg = {
       cutoutEnabled: state.config.cutoutEnabled,
-      canvaBgMode: state.studio.bgType === 'color' ? state.studio.bgColor : state.studio.bgType,
+      canvaBgMode: (state.studio.bgType === 'color' || state.studio.bgType === 'gradient') ? state.studio.bgColor : state.studio.bgType,
       canvaBlurRadius: state.studio.blurRadius,
       shadowEnabled: state.studio.shadow,
       shadowBlur: 16,

@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%234F46E5'/><text x='50%' y='68%' font-size='60' text-anchor='middle' fill='%23FFFFFF' font-family='Georgia'>✦</text></svg>">
-  <link rel="stylesheet" href="style.css?v=4.1">
+  <link rel="stylesheet" href="style.css?v=4.2">
   <!-- JSZip for multi-file batch downloads -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
@@ -171,8 +171,27 @@
               <div class="segmented-ctrl" id="segBgMode">
                 <button class="seg-btn active" data-val="transparent">Trong suốt</button>
                 <button class="seg-btn" data-val="#FFFFFF">Trắng</button>
-                <button class="seg-btn" data-val="#F8F5F0">Kem be</button>
-                <button class="seg-btn" data-val="#1E1B18">Đen</button>
+                <button class="seg-btn" data-val="#0B72B9">Xanh thẻ</button>
+                <button class="seg-btn" data-val="#D32F2F">Đỏ thẻ</button>
+                <button class="seg-btn" data-val="#F1F5F9">Xám</button>
+                <button class="seg-btn" data-val="#0F172A">Đen</button>
+              </div>
+
+              <!-- Quick Swatches Row -->
+              <div class="sidebar-swatches-row mt-1" id="sidebarSwatches">
+                <button class="sidebar-swatch" style="background:#FFFFFF;" data-color="#FFFFFF" title="Trắng VISA"></button>
+                <button class="sidebar-swatch" style="background:#0B72B9;" data-color="#0B72B9" title="Xanh thẻ chuẩn"></button>
+                <button class="sidebar-swatch" style="background:#1565C0;" data-color="#1565C0" title="Xanh đậm"></button>
+                <button class="sidebar-swatch" style="background:#D32F2F;" data-color="#D32F2F" title="Đỏ cờ"></button>
+                <button class="sidebar-swatch" style="background:#F1F5F9;" data-color="#F1F5F9" title="Xám Studio"></button>
+                <button class="sidebar-swatch" style="background:#F8F5F0;" data-color="#F8F5F0" title="Kem be"></button>
+                <button class="sidebar-swatch" style="background:#0F172A;" data-color="#0F172A" title="Đen Slate"></button>
+                <button class="sidebar-swatch" style="background:#A7F3D0;" data-color="#A7F3D0" title="Mint"></button>
+                <button class="sidebar-swatch" style="background:#FBCFE8;" data-color="#FBCFE8" title="Hồng"></button>
+                <button class="sidebar-grad-swatch" style="background: radial-gradient(circle, #334155 0%, #0F172A 100%);" data-color="radial:spotlight" title="✦ Studio Spotlight">✦</button>
+                <button class="sidebar-grad-swatch" style="background: linear-gradient(135deg, #4F46E5 0%, #9333EA 100%);" data-color="gradient:indigo_purple" title="◈ Indigo-Tím">◈</button>
+                <button class="sidebar-grad-swatch" style="background: linear-gradient(135deg, #F59E0B 0%, #EC4899 100%);" data-color="gradient:sunset" title="☀ Hoàng hôn">☀</button>
+                <input type="color" id="sideBgColorPicker" value="#0B72B9" class="custom-color-input-mini" title="Chọn màu bất kỳ">
               </div>
             </div>
 
@@ -431,18 +450,48 @@
             <div class="segmented-ctrl" id="segStudioBgType">
               <button class="seg-btn active" data-bg="transparent">Trong suốt</button>
               <button class="seg-btn" data-bg="color">Màu trơn</button>
+              <button class="seg-btn" data-bg="gradient">Gradient</button>
               <button class="seg-btn" data-bg="blur">Mờ nền</button>
             </div>
 
-            <!-- Color Palette Row -->
-            <div class="palette-swatches-row mt-2">
-              <button class="palette-swatch" style="background:#FFFFFF;" data-color="#FFFFFF" title="Trắng"></button>
-              <button class="palette-swatch" style="background:#F1F5F9;" data-color="#F1F5F9" title="Xám nhạt"></button>
+            <!-- Group 1: ID Photos / Visa -->
+            <div class="palette-category-title">Ảnh Thẻ & Hồ Sơ (ID Photo / Visa):</div>
+            <div class="palette-swatches-row mt-1">
+              <button class="palette-swatch" style="background:#0B72B9;" data-color="#0B72B9" title="Xanh thẻ chuẩn"></button>
+              <button class="palette-swatch" style="background:#1565C0;" data-color="#1565C0" title="Xanh đậm"></button>
+              <button class="palette-swatch" style="background:#D32F2F;" data-color="#D32F2F" title="Đỏ cờ"></button>
+              <button class="palette-swatch" style="background:#FFFFFF;" data-color="#FFFFFF" title="Trắng tinh VISA"></button>
+            </div>
+
+            <!-- Group 2: E-Commerce & Pastel -->
+            <div class="palette-category-title">E-Commerce & Pastel Thời Trang:</div>
+            <div class="palette-swatches-row mt-1">
+              <button class="palette-swatch" style="background:#F1F5F9;" data-color="#F1F5F9" title="Xám Studio"></button>
+              <button class="palette-swatch" style="background:#F8F5F0;" data-color="#F8F5F0" title="Kem be"></button>
+              <button class="palette-swatch" style="background:#E2E8F0;" data-color="#E2E8F0" title="Xi măng"></button>
               <button class="palette-swatch" style="background:#0F172A;" data-color="#0F172A" title="Đen Slate"></button>
-              <button class="palette-swatch" style="background:#4F46E5;" data-color="#4F46E5" title="Indigo"></button>
-              <button class="palette-swatch" style="background:#059669;" data-color="#059669" title="Emerald"></button>
-              <button class="palette-swatch" style="background:#3B82F6;" data-color="#3B82F6" title="Blue"></button>
-              <input type="color" id="studioColorPicker" value="#F8FAFC" class="custom-color-input" title="Chọn màu bất kỳ">
+              <button class="palette-swatch" style="background:#A7F3D0;" data-color="#A7F3D0" title="Mint"></button>
+              <button class="palette-swatch" style="background:#FBCFE8;" data-color="#FBCFE8" title="Hồng"></button>
+              <button class="palette-swatch" style="background:#E0E7FF;" data-color="#E0E7FF" title="Lavender"></button>
+              <button class="palette-swatch" style="background:#FEF3C7;" data-color="#FEF3C7" title="Vàng kem"></button>
+            </div>
+
+            <!-- Group 3: Gradients & Studio Spotlight -->
+            <div class="palette-category-title">Gradient Nghệ Thuật & Studio Spotlight:</div>
+            <div class="palette-swatches-row mt-1">
+              <button class="palette-grad-btn" data-color="radial:spotlight" style="background: radial-gradient(circle, #334155 0%, #0F172A 100%);">✦ Spotlight</button>
+              <button class="palette-grad-btn" data-color="gradient:indigo_purple" style="background: linear-gradient(135deg, #4F46E5 0%, #9333EA 100%);">◈ Indigo</button>
+              <button class="palette-grad-btn" data-color="gradient:sunset" style="background: linear-gradient(135deg, #F59E0B 0%, #EC4899 100%);">☀ Hoàng hôn</button>
+              <button class="palette-grad-btn" data-color="gradient:ocean" style="background: linear-gradient(135deg, #0284C7 0%, #0D9488 100%);">🌊 Biển</button>
+              <button class="palette-grad-btn" data-color="gradient:deep_slate" style="background: linear-gradient(135deg, #334155 0%, #020617 100%);">🌫 Khói</button>
+            </div>
+
+            <!-- Hex Code & Color Picker -->
+            <div class="hex-input-row mt-2">
+              <span class="form-label">Mã màu Hex:</span>
+              <input type="text" id="studioHexInput" placeholder="#0B72B9" class="custom-input hex-input" value="#0B72B9">
+              <button class="btn-sub-action btn-hex-apply" id="btnStudioApplyHex">Áp dụng</button>
+              <input type="color" id="studioColorPicker" value="#0B72B9" class="custom-color-input" title="Chọn màu bất kỳ">
             </div>
 
             <!-- Blur Slider -->

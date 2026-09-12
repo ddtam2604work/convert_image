@@ -650,7 +650,7 @@ class OmniImageStudioApp(ctk.CTk):
         )
         self.btn_open_canva_studio.grid(row=1, column=0, padx=10, pady=(4, 8), sticky="ew")
 
-        # 3. Quick Background Choice (Transparent / White / Warm Cream / Dark)
+        # 3. Quick Background Choice (Transparent / White / ID Blue / Red / Studio / Dark)
         bg_sub = ctk.CTkFrame(card, fg_color="transparent")
         bg_sub.grid(row=2, column=0, padx=10, pady=2, sticky="ew")
         bg_sub.grid_columnconfigure(1, weight=1)
@@ -663,8 +663,8 @@ class OmniImageStudioApp(ctk.CTk):
 
         self.canva_bg_segmented = ctk.CTkSegmentedButton(
             bg_sub,
-            values=["Trong suốt", "Trắng", "Kem be", "Đen"],
-            font=ctk.CTkFont("Segoe UI", 10, "bold"),
+            values=["Trong suốt", "Trắng", "Xanh thẻ", "Đỏ thẻ", "Xám", "Đen"],
+            font=ctk.CTkFont("Segoe UI", 9, "bold"),
             selected_color=ACCENT, selected_hover_color=ACCENT_HOVER,
             unselected_color=(BG_SUB_LIGHT, BG_SUB_DARK),
             text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
@@ -673,9 +673,68 @@ class OmniImageStudioApp(ctk.CTk):
         self.canva_bg_segmented.set("Trong suốt")
         self.canva_bg_segmented.grid(row=0, column=1, sticky="ew")
 
+        # 3b. Color Palette Swatches & Hex Input Row
+        swatch_row = ctk.CTkFrame(card, fg_color="transparent")
+        swatch_row.grid(row=3, column=0, padx=10, pady=(2, 4), sticky="ew")
+
+        quick_swatches = [
+            ("#FFFFFF", "Trắng"),
+            ("#0B72B9", "Xanh thẻ"),
+            ("#1565C0", "Xanh đậm"),
+            ("#D32F2F", "Đỏ cờ"),
+            ("#F1F5F9", "Xám Studio"),
+            ("#F8F5F0", "Kem be"),
+            ("#0F172A", "Đen"),
+            ("#A7F3D0", "Mint"),
+            ("#FBCFE8", "Hồng"),
+        ]
+        for hex_col, sname in quick_swatches:
+            btn_sw = ctk.CTkButton(
+                swatch_row, text="", width=18, height=18, corner_radius=9,
+                fg_color=hex_col, hover_color=hex_col,
+                border_width=1, border_color=(BORDER_LIGHT, BORDER_DARK),
+                command=lambda c=hex_col: self.select_custom_bg_color(c)
+            )
+            btn_sw.pack(side="left", padx=1)
+
+        # Gradient Swatches
+        btn_sw_spot = ctk.CTkButton(
+            swatch_row, text="✦", width=18, height=18, corner_radius=9,
+            font=ctk.CTkFont("Segoe UI", 9, "bold"),
+            fg_color="#1E293B", hover_color="#334155", text_color="#F8FAFC",
+            command=lambda: self.select_custom_bg_color("radial:spotlight")
+        )
+        btn_sw_spot.pack(side="left", padx=1)
+
+        btn_sw_ind = ctk.CTkButton(
+            swatch_row, text="◈", width=18, height=18, corner_radius=9,
+            font=ctk.CTkFont("Segoe UI", 9, "bold"),
+            fg_color="#4F46E5", hover_color="#6366F1", text_color="white",
+            command=lambda: self.select_custom_bg_color("gradient:indigo_purple")
+        )
+        btn_sw_ind.pack(side="left", padx=1)
+
+        btn_sw_sun = ctk.CTkButton(
+            swatch_row, text="☀", width=18, height=18, corner_radius=9,
+            font=ctk.CTkFont("Segoe UI", 9, "bold"),
+            fg_color="#F59E0B", hover_color="#EC4899", text_color="white",
+            command=lambda: self.select_custom_bg_color("gradient:sunset")
+        )
+        btn_sw_sun.pack(side="left", padx=1)
+
+        # Color picker button
+        btn_pick_side = ctk.CTkButton(
+            swatch_row, text="🎨", width=24, height=18, corner_radius=4,
+            font=ctk.CTkFont("Segoe UI", 10),
+            fg_color=(BG_SUB_LIGHT, BG_SUB_DARK), hover_color=(BORDER_LIGHT, BORDER_DARK),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
+            command=self.pick_sidebar_bg_color
+        )
+        btn_pick_side.pack(side="left", padx=(3, 0))
+
         # 4. Drop Shadow & Glow Checkboxes
         effects_box = ctk.CTkFrame(card, fg_color="transparent")
-        effects_box.grid(row=3, column=0, padx=10, pady=(4, 4), sticky="ew")
+        effects_box.grid(row=4, column=0, padx=10, pady=(4, 4), sticky="ew")
         effects_box.grid_columnconfigure(0, weight=1)
         effects_box.grid_columnconfigure(1, weight=1)
 
@@ -703,7 +762,7 @@ class OmniImageStudioApp(ctk.CTk):
 
         # 5. Tolerance Slider
         tol_box = ctk.CTkFrame(card, fg_color="transparent")
-        tol_box.grid(row=4, column=0, padx=10, pady=(2, 4), sticky="ew")
+        tol_box.grid(row=5, column=0, padx=10, pady=(2, 4), sticky="ew")
         tol_box.grid_columnconfigure(0, weight=1)
 
         tol_hdr = ctk.CTkFrame(tol_box, fg_color="transparent")
@@ -734,7 +793,7 @@ class OmniImageStudioApp(ctk.CTk):
 
         # 6. Sharpen Slider
         sharp_box = ctk.CTkFrame(card, fg_color="transparent")
-        sharp_box.grid(row=5, column=0, padx=10, pady=(2, 10), sticky="ew")
+        sharp_box.grid(row=6, column=0, padx=10, pady=(2, 10), sticky="ew")
         sharp_box.grid_columnconfigure(0, weight=1)
 
         sharp_hdr = ctk.CTkFrame(sharp_box, fg_color="transparent")
@@ -1151,13 +1210,59 @@ class OmniImageStudioApp(ctk.CTk):
         elif value == "Trắng":
             self.canva_bg_mode.set("color")
             self.canva_bg_color.set("#FFFFFF")
-        elif value == "Kem be":
+            self.var_remove_bg.set(True)
+        elif value == "Xanh thẻ":
+            self.canva_bg_mode.set("color")
+            self.canva_bg_color.set("#0B72B9")
+            self.var_remove_bg.set(True)
+        elif value == "Đỏ thẻ":
+            self.canva_bg_mode.set("color")
+            self.canva_bg_color.set("#D32F2F")
+            self.var_remove_bg.set(True)
+        elif value == "Xám":
             self.canva_bg_mode.set("color")
             self.canva_bg_color.set("#F1F5F9")
+            self.var_remove_bg.set(True)
         elif value == "Đen":
             self.canva_bg_mode.set("color")
             self.canva_bg_color.set("#0F172A")
+            self.var_remove_bg.set(True)
         self.schedule_live_preview()
+
+    def select_custom_bg_color(self, val):
+        if not val or val == "transparent":
+            self.canva_bg_mode.set("transparent")
+            self.canva_bg_segmented.set("Trong suốt")
+        elif val.startswith("gradient:") or val.startswith("radial:"):
+            self.canva_bg_mode.set("gradient")
+            self.canva_bg_color.set(val)
+            self.var_remove_bg.set(True)
+            self.canva_bg_segmented.set("")
+        else:
+            self.canva_bg_mode.set("color")
+            self.canva_bg_color.set(val)
+            self.var_remove_bg.set(True)
+            mapping = {
+                "#FFFFFF": "Trắng",
+                "#0B72B9": "Xanh thẻ",
+                "#D32F2F": "Đỏ thẻ",
+                "#F1F5F9": "Xám",
+                "#0F172A": "Đen"
+            }
+            self.canva_bg_segmented.set(mapping.get(val.upper(), ""))
+        self.schedule_live_preview()
+
+    def pick_sidebar_bg_color(self):
+        try:
+            from tkinter import colorchooser
+            curr = self.canva_bg_color.get()
+            if not curr.startswith("#"):
+                curr = "#0B72B9"
+            chosen = colorchooser.askcolor(color=curr, title="Chọn màu nền")[1]
+            if chosen:
+                self.select_custom_bg_color(chosen.upper())
+        except Exception as e:
+            logger.error(f"Color chooser error: {e}")
 
     def _on_preset_selected(self, choice):
         dims = PRESETS.get(choice)
@@ -1356,10 +1461,12 @@ class OmniImageStudioApp(ctk.CTk):
         # Perform fast filter preview on downscaled base
         proc_preview = NativeImageEngine.resize_image(preview_base, disp_w, disp_h, fit_mode=fit)
         
-        if self.var_remove_bg.get():
-            proc_preview = NativeImageEngine.remove_background(
-                proc_preview, int(self.slider_tolerance.get())
-            )
+        has_custom_bg = (self.canva_bg_mode.get() not in ("transparent", "") and bool(self.canva_bg_color.get()))
+        if self.var_remove_bg.get() or has_custom_bg:
+            if self.var_remove_bg.get() or proc_preview.mode != "RGBA":
+                proc_preview = NativeImageEngine.remove_background(
+                    proc_preview, int(self.slider_tolerance.get())
+                )
             # Canva Background replacement
             if self.canva_bg_mode.get() != "transparent":
                 proc_preview = NativeImageEngine.apply_canva_background(
@@ -1996,61 +2103,169 @@ class OmniImageStudioApp(ctk.CTk):
                 state["bg_type"] = "transparent"
             elif v == "Màu trơn":
                 state["bg_type"] = "color"
+            elif v == "Gradient":
+                state["bg_type"] = "gradient"
+                if not (state["bg_color"].startswith("gradient:") or state["bg_color"].startswith("radial:")):
+                    state["bg_color"] = "radial:spotlight"
             elif v == "Mờ nền":
                 state["bg_type"] = "blur"
             render_composite()
 
         seg_bg = ctk.CTkSegmentedButton(
             card_bg,
-            values=["Trong suốt", "Màu trơn", "Mờ nền"],
-            font=ctk.CTkFont("Segoe UI", 10, "bold"),
+            values=["Trong suốt", "Màu trơn", "Gradient", "Mờ nền"],
+            font=ctk.CTkFont("Segoe UI", 9, "bold"),
             selected_color=ACCENT, selected_hover_color=ACCENT_HOVER,
             unselected_color=(BG_SUB_LIGHT, BG_SUB_DARK),
             command=on_bg_mode_change
         )
-        seg_bg.set("Trong suốt" if state["bg_type"] == "transparent" else ("Màu trơn" if state["bg_type"] == "color" else "Mờ nền"))
+        current_bg_type = state["bg_type"]
+        seg_bg.set("Trong suốt" if current_bg_type == "transparent" else ("Gradient" if current_bg_type == "gradient" or str(state["bg_color"]).startswith(("gradient:", "radial:")) else ("Màu trơn" if current_bg_type == "color" else "Mờ nền")))
         seg_bg.grid(row=0, column=0, padx=8, pady=(8, 6), sticky="ew")
 
-        frame_palette = ctk.CTkFrame(card_bg, fg_color="transparent")
-        frame_palette.grid(row=1, column=0, padx=8, pady=(0, 6), sticky="ew")
-
         def on_select_color(col):
-            state["bg_type"] = "color"
-            state["bg_color"] = col
-            seg_bg.set("Màu trơn")
+            if col.startswith("gradient:") or col.startswith("radial:"):
+                state["bg_type"] = "gradient"
+                state["bg_color"] = col
+                seg_bg.set("Gradient")
+            else:
+                state["bg_type"] = "color"
+                state["bg_color"] = col
+                seg_bg.set("Màu trơn")
+            if 'entry_hex_studio' in locals() and col.startswith("#"):
+                entry_hex_studio.delete(0, "end")
+                entry_hex_studio.insert(0, col)
             render_composite()
 
         def pick_custom_color():
             c = colorchooser.askcolor(title="Chọn màu nền", parent=dialog)
             if c and c[1]:
-                on_select_color(c[1])
+                on_select_color(c[1].upper())
 
-        swatches = [
-            ("#FFFFFF", "Trắng"),
-            ("#F1F5F9", "Xám nhạt"),
-            ("#0F172A", "Đen Slate"),
-            ("#4F46E5", "Indigo"),
-            ("#059669", "Emerald"),
-            ("#3B82F6", "Blue"),
+        # Category 1: Ảnh thẻ & Visa
+        ctk.CTkLabel(
+            card_bg, text="Ảnh Thẻ & Hồ Sơ (ID Photo / Visa):",
+            font=ctk.CTkFont("Segoe UI", 10, "bold"),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
+        ).grid(row=1, column=0, padx=8, pady=(2, 2), sticky="w")
+
+        pal_id = ctk.CTkFrame(card_bg, fg_color="transparent")
+        pal_id.grid(row=2, column=0, padx=8, pady=(0, 4), sticky="ew")
+
+        id_swatches = [
+            ("#0B72B9", "Xanh thẻ chuẩn"),
+            ("#1565C0", "Xanh đậm"),
+            ("#D32F2F", "Đỏ cờ"),
+            ("#FFFFFF", "Trắng tinh VISA")
         ]
-        for hex_col, name in swatches:
-            btn_sw = ctk.CTkButton(
-                frame_palette, text="", width=24, height=24, corner_radius=12,
-                fg_color=hex_col, hover_color=hex_col, border_width=1, border_color=(BORDER_LIGHT, BORDER_DARK),
+        for hex_col, sname in id_swatches:
+            btn = ctk.CTkButton(
+                pal_id, text="", width=24, height=24, corner_radius=12,
+                fg_color=hex_col, hover_color=hex_col,
+                border_width=1, border_color=(BORDER_LIGHT, BORDER_DARK),
                 command=lambda c=hex_col: on_select_color(c)
             )
-            btn_sw.pack(side="left", padx=2)
+            btn.pack(side="left", padx=3)
+
+        # Category 2: E-Commerce & Pastel
+        ctk.CTkLabel(
+            card_bg, text="E-Commerce & Pastel Thời Trang:",
+            font=ctk.CTkFont("Segoe UI", 10, "bold"),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
+        ).grid(row=3, column=0, padx=8, pady=(2, 2), sticky="w")
+
+        pal_com = ctk.CTkFrame(card_bg, fg_color="transparent")
+        pal_com.grid(row=4, column=0, padx=8, pady=(0, 4), sticky="ew")
+
+        com_swatches = [
+            ("#F1F5F9", "Xám Studio"),
+            ("#F8F5F0", "Kem be"),
+            ("#E2E8F0", "Xi măng"),
+            ("#0F172A", "Đen Slate"),
+            ("#A7F3D0", "Mint"),
+            ("#FBCFE8", "Hồng"),
+            ("#E0E7FF", "Lavender"),
+            ("#FEF3C7", "Vàng kem")
+        ]
+        for hex_col, sname in com_swatches:
+            btn = ctk.CTkButton(
+                pal_com, text="", width=24, height=24, corner_radius=12,
+                fg_color=hex_col, hover_color=hex_col,
+                border_width=1, border_color=(BORDER_LIGHT, BORDER_DARK),
+                command=lambda c=hex_col: on_select_color(c)
+            )
+            btn.pack(side="left", padx=2)
+
+        # Category 3: Gradient Studio & Ánh sáng
+        ctk.CTkLabel(
+            card_bg, text="Gradient Nghệ Thuật & Studio Spotlight:",
+            font=ctk.CTkFont("Segoe UI", 10, "bold"),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
+        ).grid(row=5, column=0, padx=8, pady=(2, 2), sticky="w")
+
+        pal_grad = ctk.CTkFrame(card_bg, fg_color="transparent")
+        pal_grad.grid(row=6, column=0, padx=8, pady=(0, 6), sticky="ew")
+
+        grad_presets = [
+            ("radial:spotlight", "✦ Spotlight", "#1E293B"),
+            ("gradient:indigo_purple", "◈ Indigo", "#4F46E5"),
+            ("gradient:sunset", "☀ Hoàng hôn", "#F59E0B"),
+            ("gradient:ocean", "🌊 Biển", "#0284C7"),
+            ("gradient:deep_slate", "🌫 Khói", "#334155"),
+        ]
+        for gkey, gname, gcolor in grad_presets:
+            btn_g = ctk.CTkButton(
+                pal_grad, text=gname, height=24, corner_radius=6,
+                font=ctk.CTkFont("Segoe UI", 9, "bold"),
+                fg_color=gcolor, hover_color=ACCENT, text_color="white",
+                command=lambda k=gkey: on_select_color(k)
+            )
+            btn_g.pack(side="left", padx=2)
+
+        # Hex code & Color Chooser bar
+        frame_hex = ctk.CTkFrame(card_bg, fg_color="transparent")
+        frame_hex.grid(row=7, column=0, padx=8, pady=(0, 6), sticky="ew")
+        frame_hex.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            frame_hex, text="Mã màu Hex:",
+            font=ctk.CTkFont("Segoe UI", 10),
+            text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
+        ).grid(row=0, column=0, padx=(0, 4), sticky="w")
+
+        entry_hex_studio = ctk.CTkEntry(
+            frame_hex, height=26, font=ctk.CTkFont("Consolas", 10),
+            fg_color=(BG_INPUT_LIGHT, BG_INPUT_DARK),
+            border_width=1, border_color=(BORDER_LIGHT, BORDER_DARK)
+        )
+        entry_hex_studio.insert(0, state["bg_color"] if state["bg_color"].startswith("#") else "#0B72B9")
+        entry_hex_studio.grid(row=0, column=1, padx=(0, 4), sticky="ew")
+
+        def on_apply_hex():
+            val = entry_hex_studio.get().strip()
+            if val:
+                if not val.startswith("#"):
+                    val = "#" + val
+                on_select_color(val.upper())
+
+        btn_apply_hex = ctk.CTkButton(
+            frame_hex, text="Áp dụng", width=58, height=26, corner_radius=6,
+            font=ctk.CTkFont("Segoe UI", 9, "bold"),
+            fg_color=ACCENT, hover_color=ACCENT_HOVER,
+            command=on_apply_hex
+        )
+        btn_apply_hex.grid(row=0, column=2, padx=(0, 4))
 
         btn_pick_color = ctk.CTkButton(
-            frame_palette, text="🎨", width=28, height=24, corner_radius=6,
+            frame_hex, text="🎨", width=28, height=26, corner_radius=6,
             fg_color=(BG_SUB_LIGHT, BG_SUB_DARK), hover_color=(BORDER_LIGHT, BORDER_DARK),
             text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
             command=pick_custom_color
         )
-        btn_pick_color.pack(side="left", padx=4)
+        btn_pick_color.grid(row=0, column=3)
 
         frame_blur = ctk.CTkFrame(card_bg, fg_color="transparent")
-        frame_blur.grid(row=2, column=0, padx=8, pady=(0, 8), sticky="ew")
+        frame_blur.grid(row=8, column=0, padx=8, pady=(0, 8), sticky="ew")
         frame_blur.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(frame_blur, text="Độ mờ hậu cảnh (Bokeh Blur):", font=ctk.CTkFont("Segoe UI", 10), text_color=(TEXT_MUTED_L, TEXT_MUTED_D)).grid(row=0, column=0, sticky="w")
@@ -2334,6 +2549,12 @@ class OmniImageStudioApp(ctk.CTk):
                 return
             item["img"] = state["composite_img"]
             item["orig_w"], item["orig_h"] = state["composite_img"].size
+            if state["bg_type"] in ("color", "gradient"):
+                self.select_custom_bg_color(state["bg_color"])
+            elif state["bg_type"] == "transparent":
+                self.select_custom_bg_color("transparent")
+            self.canva_shadow_enabled.set(state["shadow_enabled"])
+            self.canva_glow_enabled.set(state["glow_enabled"])
             self._preview_cache.pop(self.current_preview_index, None)
             self.schedule_live_preview()
             self._render_queue_table()
@@ -2963,8 +3184,10 @@ class OmniImageStudioApp(ctk.CTk):
                 h = th if th > 0 else img.height
 
                 proc = NativeImageEngine.resize_image(img, w, h, fit_mode=fit)
-                if rem_bg:
-                    proc = NativeImageEngine.remove_background(proc, tol)
+                has_custom_bg = (self.canva_bg_mode.get() not in ("transparent", "") and bool(self.canva_bg_color.get()))
+                if rem_bg or has_custom_bg:
+                    if rem_bg or proc.mode != "RGBA":
+                        proc = NativeImageEngine.remove_background(proc, tol)
                     if self.canva_bg_mode.get() != "transparent":
                         proc = NativeImageEngine.apply_canva_background(
                             proc,
