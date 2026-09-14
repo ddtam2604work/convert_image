@@ -1,0 +1,21 @@
+{
+  "name": "convert_image",
+  "version": "2.4.0",
+  "description": "Lumina Studio Pro — Light Studio Precision v2.4 (Canva Cutout, Inpaint & Batch Studio)",
+  "main": "server.py",
+  "scripts": {
+    "dev": "python server.py",
+    "start": "python server.py",
+    "build:exe": "python -m PyInstaller --noconfirm --onefile --windowed --name \"OmniImageStudio\" --distpath \".\" --add-data \"index.html;.\" --add-data \"style.css;.\" --add-data \"app.js;.\" --add-data \"manifest.json;.\" --add-data \"samples;samples\" src/main_gui.py"
+  },
+  "keywords": [
+    "lumina-studio-pro",
+    "canva-cutout",
+    "image-editor",
+    "inpaint",
+    "steganography",
+    "batch-converter"
+  ],
+  "author": "Lumina Studio Pro",
+  "license": "MIT"
+}

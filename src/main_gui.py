@@ -35,43 +35,46 @@ else:
 from core_engine import NativeImageEngine
 
 # ─── THEME CONFIGURATION ─────────────────────────────────────────────────────
+# ─── THEME CONFIGURATION ─────────────────────────────────────────────────────
 ctk.set_appearance_mode("Light")
 ctk.set_default_color_theme("blue")
 
-# ─── COLOR PALETTE TOKENS (MODERN CREATIVE STUDIO — SLATE & VIBRANT INDIGO) ───
-# App Backgrounds (Matching Web Studio: Crisp Slate & Deep Midnight Slate)
-BG_APP_DARK    = "#0b0f19"       # Midnight Space Slate
-BG_APP_LIGHT   = "#f8fafc"       # Soft Light Slate (Slate-50)
-BG_PANEL_DARK  = "#111827"       # Deep Dark Panel
-BG_PANEL_LIGHT = "#ffffff"       # Pure White Card Surface
-BG_CARD_DARK   = "#1e293b"       # Slate-800 Card
-BG_CARD_LIGHT  = "#ffffff"       # Pure White Card
-BG_SUB_DARK    = "#334155"       # Slate-700 Sub/Inactive Container
-BG_SUB_LIGHT   = "#f1f5f9"       # Slate-100 Sub/Inactive Container
+# ─── COLOR PALETTE TOKENS (LUMINA STUDIO PRO — LIGHT STUDIO PRECISION V2.4) ───
+# App Backgrounds (Matching Web Studio: Precision Light #F8FAFC & #FFFFFF)
+BG_APP_DARK    = "#f8fafc"       # Clean Studio Base
+BG_APP_LIGHT   = "#f8fafc"       
+BG_PANEL_DARK  = "#ffffff"       # Surface Level 1
+BG_PANEL_LIGHT = "#ffffff"       
+BG_CARD_DARK   = "#eff4ff"       # Surface Container Low
+BG_CARD_LIGHT  = "#eff4ff"       
+BG_SUB_DARK    = "#e2e8f0"       # Surface Container
+BG_SUB_LIGHT   = "#e2e8f0"       
 
 # Borders
-BORDER_DARK    = "#334155"       # Slate-700 Border
-BORDER_LIGHT   = "#e2e8f0"       # Slate-200 Subtle Border
-BORDER_ACCENT  = "#6366f1"       # Vibrant Indigo Border Focus
+BORDER_DARK    = "#e2e8f0"       # Mechanical Border
+BORDER_LIGHT   = "#e2e8f0"       
+BORDER_ACCENT  = "#4648d4"       # Vibrant Indigo Border Focus
 
-# Typography — High contrast & ultra legible for Light & Dark modes
-TEXT_PRIMARY_D = "#f8fafc"       # Slate-50 Crisp White
-TEXT_PRIMARY_L = "#0f172a"       # Slate-900 High-contrast Near-Black
-TEXT_MUTED_D   = "#94a3b8"       # Slate-400
-TEXT_MUTED_L   = "#475569"       # Slate-600
-TEXT_FAINT_D   = "#64748b"       # Slate-500
-TEXT_FAINT_L   = "#94a3b8"       # Slate-400
+# Typography — High contrast & ultra legible for Light Studio mode
+TEXT_PRIMARY_D = "#0f172a"       # Slate-900
+TEXT_PRIMARY_L = "#0f172a"       
+TEXT_MUTED_D   = "#475569"       # Slate-600
+TEXT_MUTED_L   = "#475569"       
+TEXT_FAINT_D   = "#94a3b8"       # Slate-400
+TEXT_FAINT_L   = "#94a3b8"       
 
 # Semantic Brand Accents
-ACCENT         = "#4f46e5"       # Vibrant Studio Indigo (Brand)
-ACCENT_HOVER   = "#4338ca"       # Indigo-700
-ACCENT_LIGHT   = "#eef2ff"       # Indigo-50
-SUCCESS        = "#059669"       # Emerald Green-600 (CTA Start Convert)
-SUCCESS_HOVER  = "#047857"       # Emerald-700
-WARNING        = "#d97706"       # Amber-600
-WARNING_HOVER  = "#b45309"       # Amber-700
-DANGER         = "#ef4444"       # Rose Red-500
-DANGER_HOVER   = "#dc2626"       # Rose-600
+ACCENT         = "#4648d4"       # Electric Indigo
+ACCENT_HOVER   = "#3730a3"       
+ACCENT_LIGHT   = "#e0e7ff"       
+SECONDARY      = "#0284c7"       # Sky Blue
+TERTIARY       = "#7c3aed"       # Violet
+SUCCESS        = "#10b981"       # Emerald CTA
+SUCCESS_HOVER  = "#059669"       
+WARNING        = "#f59e0b"       
+WARNING_HOVER  = "#d97706"       
+DANGER         = "#dc2626"       
+DANGER_HOVER   = "#b91c1c"
 
 # ─── HIGH CONTRAST WIDGET CONTRAST ENHANCEMENTS ─────────────────────────────
 # Automatically ensure high contrast text colors for Segmented Buttons,
@@ -243,7 +246,7 @@ class OmniImageStudioApp(ctk.CTk):
 
     # ── UI Construction ──────────────────────────────────────────────────────
     def _build_ui(self):
-        self.title("OmniImage Studio — Công Cụ Xử Lý & Chuyển Đổi Ảnh Đa Năng")
+        self.title("Lumina Studio Pro — Studio Precision v2.4")
 
         # Smart window centering
         self.update_idletasks()
@@ -305,25 +308,25 @@ class OmniImageStudioApp(ctk.CTk):
         title_box.pack(side="left", padx=(0, 10))
 
         sub_label = ctk.CTkLabel(
-            title_box, text="D E S I G N   W I T H   E M P A T H Y",
-            font=ctk.CTkFont("Segoe UI", 9, "bold"),
-            text_color=ACCENT
+            title_box, text="S T U D I O   P R E C I S I O N   V 2 . 4",
+            font=ctk.CTkFont("Segoe UI", 8, "bold"),
+            text_color=SECONDARY
         )
         sub_label.pack(anchor="w", pady=(0, 1))
 
         logo_text = ctk.CTkLabel(
-            title_box, text="OmniImage Studio",
+            title_box, text="Lumina Studio Pro",
             font=ctk.CTkFont("Georgia", 16, "bold"),
             text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
         )
         logo_text.pack(anchor="w")
 
-        BadgePill(brand_frame, "CANVA CUTOUT PRO", color=ACCENT).pack(side="left", padx=(0, 14))
+        BadgePill(brand_frame, "PRECISION AI V2.4", color=ACCENT).pack(side="left", padx=(0, 14))
 
         # Aesthetic Color Swatch Preview Pill
         swatch_frame = ctk.CTkFrame(brand_frame, fg_color=(BG_CARD_LIGHT, BG_CARD_DARK), corner_radius=12, border_width=1, border_color=(BORDER_LIGHT, BORDER_DARK))
         swatch_frame.pack(side="left", padx=(0, 10), pady=4)
-        for c in ("#4F46E5", "#059669", "#3B82F6", "#0F172A"):
+        for c in ("#6366F1", "#06B6D4", "#10B981", "#14171F"):
             dot = ctk.CTkFrame(swatch_frame, width=14, height=14, corner_radius=7, fg_color=c, border_width=1, border_color=(BORDER_LIGHT, BORDER_DARK))
             dot.pack(side="left", padx=3, pady=3)
 
@@ -3251,9 +3254,74 @@ class OmniImageStudioApp(ctk.CTk):
             self.status_label.configure(text_color=color)
 
 
+def launch_studio_webview():
+    """Launch modern Studio desktop application via Microsoft Edge WebView2."""
+    try:
+        import webview
+    except ImportError:
+        return False
+
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(base_dir, "..", "index.html"),
+        os.path.join(base_dir, "index.html"),
+        os.path.join(os.getcwd(), "index.html"),
+        os.path.join(getattr(sys, "_MEIPASS", ""), "index.html")
+    ]
+    index_path = None
+    for c in candidates:
+        if c and os.path.exists(c):
+            index_path = os.path.abspath(c)
+            break
+
+    if not index_path:
+        return False
+
+    class StudioBridgeAPI:
+        def select_files(self):
+            import tkinter as tk
+            from tkinter import filedialog
+            root = tk.Tk()
+            root.withdraw()
+            files = filedialog.askopenfilenames(
+                title="Lumina Studio Pro — Chọn File Ảnh",
+                filetypes=[("Image Files", "*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.gif;*.tiff;*.ico"), ("All Files", "*.*")]
+            )
+            root.destroy()
+            return list(files)
+
+        def open_folder(self, path=None):
+            if not path or not os.path.exists(path):
+                path = os.path.abspath(os.getcwd())
+            os.startfile(path)
+            return True
+
+    api = StudioBridgeAPI()
+    file_url = f"file:///{index_path.replace(chr(92), '/')}"
+    window = webview.create_window(
+        title="Lumina Studio Pro — Light Studio Precision v2.4",
+        url=file_url,
+        width=1440,
+        height=900,
+        min_size=(1024, 700),
+        js_api=api,
+        background_color="#F8FAFC"
+    )
+    webview.start(gui="edgechromium", debug=False)
+    return True
+
+
 # ─── ENTRY POINT ─────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     multiprocessing.freeze_support()
+    use_tk = "--tk" in sys.argv
+    if not use_tk:
+        try:
+            if launch_studio_webview():
+                sys.exit(0)
+        except Exception as e:
+            print("WebView2 failed to start, falling back to CustomTkinter:", e)
+
     try:
         app = OmniImageStudioApp()
         app.mainloop()
@@ -3266,7 +3334,7 @@ if __name__ == "__main__":
             root = tk.Tk()
             root.withdraw()
             messagebox.showerror(
-                "OmniImage Studio — Lỗi Khởi Động",
+                "Lumina Studio Pro — Lỗi Khởi Động",
                 f"Đã xảy ra sự cố khi khởi chạy ứng dụng:\n\n{e}\n\nChi tiết:\n{err_detail}"
             )
             root.destroy()

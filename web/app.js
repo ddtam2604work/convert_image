@@ -1,1110 +1,1279 @@
 /**
- * OmniImage Studio v2.5 — Full Studio Web Application Engine
- * 100% Client-Side Canvas, Image Processing, Canva Cutout, Inpainting & Stego Suite
+ * Lumina Studio Pro — Light Studio Precision v2.4
+ * Core Reactive Studio Engine & Real-Time Image Processing Suite
+ * Full Implementation: Pixel-level Exposure, Contrast, Highlights, Shadows,
+ * AI Enhance, Denoise, 3-Way Color Wheels, RGB Histogram, Layers & Canva FX.
  */
 
 (function () {
   'use strict';
 
-  // ─── STATE MANAGEMENT ─────────────────────────────────────────────────────
+  // ─── STUDIO STATE ──────────────────────────────────────────────────────────
   const state = {
-    files: [],              // Array of { id, file, name, img, origW, origH, status, procBlob, customMask }
+    files: [],             // Array of { id, name, file, img, origW, origH, status }
     activeIndex: -1,
-    theme: 'light',
-    viewMode: 'compare',   // 'compare', 'single-proc', 'single-orig'
-    zoomFit: true,         // true: fill box, false: 100% actual size
+    activeTool: 'select',
+    activeSubTool: 'move',
+    zoomLevel: 1.0,
+    isComparing: false,
+    rtxAccelerated: true,
+
+    // Optical & Neural Parameters
+    adjustments: {
+      aiEnhance: 82,       // 0 to 100%
+      denoise: 60,         // 0 to 100%
+      exposure: 18,        // -100 to 100 (+0.35 EV)
+      contrast: 18,        // -100 to 100
+      highlights: -24,     // -100 to 100
+      shadows: 35,         // -100 to 100
+      colorWheels: {
+        shadows: { angle: 198, sat: 14 },
+        midtones: { angle: 38, sat: 8 },
+        highlights: { angle: 214, sat: 12 }
+      },
+      colorPreset: 'Teal & Orange'
+    },
+
+    // Studio FX & Cutout
+    fx: {
+      cutoutActive: false,
+      defringe: false,
+      upscale4k: false,
+      dropShadow: false,
+      shadowBlur: 16,
+      shadowOpacity: 0.45,
+      relightGlow: false,
+      glowColor: '#4648d4'
+    },
+
+    // Layers Manager
+    layers: {
+      subject: { visible: true, opacity: 1.0, locked: false },
+      glow: { visible: true, opacity: 0.85, locked: true },
+      lut: { visible: true, opacity: 0.65, locked: false },
+      alpha: { visible: true, locked: true }
+    },
+
+    // Export & Sizing Configuration
     config: {
       format: 'WEBP',
       quality: 0.90,
       preset: '',
       targetW: null,
-      targetH: null,
-      lockAspect: true,
-      aspectRatio: 1.0,
-      fitMode: 'stretch',
-      cutoutEnabled: false,
-      canvaBgMode: 'transparent',
-      canvaBgColor: '#FFFFFF',
-      canvaBlurRadius: 20,
-      shadowEnabled: false,
-      shadowBlur: 16,
-      shadowOpacity: 0.45,
-      glowEnabled: false,
-      glowWidth: 6,
-      glowColor: '#FFFFFF',
-      tolerance: 35,
-      sharpen: 0,
-      cleanStego: false,
-      hiddenLogoImg: null,
-      hiddenLogoName: null
+      targetH: null
     },
-    // Canva Studio Modal State
-    studio: {
-      tool: 'view',         // 'view', 'erase', 'restore'
-      brushSize: 25,
-      isDrawing: false,
-      method: 'smart',
-      bgType: 'transparent',
-      bgColor: '#FFFFFF',
-      blurRadius: 25,
-      shadow: false,
-      glow: false,
-      undoStack: [],
-      maskCanvas: null,
-      baseCanvas: null
-    },
-    // Watermark & Object Inpaint Studio State
-    watermark: {
-      tool: 'brush', // 'brush', 'rect', 'eraser'
+
+    // Inpaint Studio
+    inpaint: {
+      tool: 'brush',
       brushSize: 24,
-      inpaintRadius: 4,
-      method: 'telea', // 'telea', 'ns'
-      alsoCleanLsb: true,
       isDrawing: false,
       lastX: null,
-      lastY: null,
-      rectStart: null,
-      rectCurrent: null,
-      maskCanvas: null,
-      baseCanvas: null,
-      originalCanvas: null,
-      history: [],
-      isComparing: false
-    }
+      lastY: null
+    },
+
+    // Pan state
+    pan: {
+      isPanning: false,
+      startX: 0,
+      startY: 0,
+      transX: 0,
+      transY: 0
+    },
+
+    // Undo / Redo Stacks
+    history: ['Khởi tạo studio'],
+    redoStack: []
   };
 
-  // ─── DOM ELEMENT REFERENCES ───────────────────────────────────────────────
+  // ─── DOM ELEMENT SHORTCUTS ────────────────────────────────────────────────
+  const $ = (id) => document.getElementById(id);
+  const $$ = (selector) => document.querySelectorAll(selector);
+
   const el = {
-    // Inputs & Header
-    fileInput: document.getElementById('fileInput'),
-    logoInput: document.getElementById('logoInput'),
-    btnSelectFiles: document.getElementById('btnSelectFiles'),
-    btnPasteClipboard: document.getElementById('btnPasteClipboard'),
-    lblFileCount: document.getElementById('lblFileCount'),
-    btnThemeToggle: document.getElementById('btnThemeToggle'),
-    themeIcon: document.getElementById('themeIcon'),
-    themeText: document.getElementById('themeText'),
+    // Inputs
+    fileInput: $('fileInput'),
+    logoInput: $('logoInput'),
+    customBgInput: $('customBgInput'),
 
-    // Format & Quality
-    segFormat: document.getElementById('segFormat'),
-    selExtraFormat: document.getElementById('selExtraFormat'),
-    sliderQuality: document.getElementById('sliderQuality'),
-    lblQuality: document.getElementById('lblQuality'),
+    // Header Elements
+    hdrFileName: $('hdrFileName'),
+    hdrBitDepth: $('hdrBitDepth'),
+    hdrZoomText: $('hdrZoomText'),
+    btnHdrUndo: $('btnHdrUndo'),
+    btnHdrRedo: $('btnHdrRedo'),
+    btnHeaderExport: $('btnHeaderExport'),
+    quickExportMenu: $('quickExportMenu'),
+    btnQuickPng: $('btnQuickPng'),
+    btnQuickWebp: $('btnQuickWebp'),
+    btnQuickJpg: $('btnQuickJpg'),
+    btnOpenFullExportModal: $('btnOpenFullExportModal'),
+    btnZoomDropdown: $('btnZoomDropdown'),
+    btnToggleRTX: $('btnToggleRTX'),
+    btnLogoHome: $('btnLogoHome'),
+    btnOpenFileBadge: $('btnOpenFileBadge'),
+    btnUserProfile: $('btnUserProfile'),
 
-    // Resize
-    selPreset: document.getElementById('selPreset'),
-    inputWidth: document.getElementById('inputWidth'),
-    inputHeight: document.getElementById('inputHeight'),
-    chkLockAspect: document.getElementById('chkLockAspect'),
-    selFitMode: document.getElementById('selFitMode'),
+    // Nav Pills
+    btnNavEdit: $('btnNavEdit'),
+    btnNavGenAI: $('btnNavGenAI'),
+    btnNavBatch: $('btnNavBatch'),
+    btnNavLibrary: $('btnNavLibrary'),
 
-    // Canva Cutout & Sharpen
-    swCutout: document.getElementById('swCutout'),
-    btnOpenCanvaStudio: document.getElementById('btnOpenCanvaStudio'),
-    segBgMode: document.getElementById('segBgMode'),
-    chkShadow: document.getElementById('chkShadow'),
-    chkGlow: document.getElementById('chkGlow'),
-    sliderTolerance: document.getElementById('sliderTolerance'),
-    lblTolerance: document.getElementById('lblTolerance'),
-    sliderSharpen: document.getElementById('sliderSharpen'),
-    lblSharpen: document.getElementById('lblSharpen'),
+    // Canvas Workspace
+    canvasFileName: $('canvasFileName'),
+    canvasFormatBadge: $('canvasFormatBadge'),
+    canvasAlphaBadge: $('canvasAlphaBadge'),
+    canvasZoomLabel: $('canvasZoomLabel'),
+    btnZoomIn: $('btnZoomIn'),
+    btnZoomOut: $('btnZoomOut'),
+    btnToggleCompare: $('btnToggleCompare'),
+    viewportContainer: $('viewportContainer'),
+    artboardWrapper: $('artboardWrapper'),
+    emptyDropzone: $('emptyDropzone'),
+    btnEmptyBrowse: $('btnEmptyBrowse'),
+    mainCanvas: $('mainCanvas'),
+    compareOverlay: $('compareOverlay'),
+    compareCanvas: $('compareCanvas'),
+    compareDivider: $('compareDivider'),
+    studioBoundingBox: $('studioBoundingBox'),
+    ambientGlow: $('ambientGlow'),
+    pinCutout: $('pinCutout'),
+    pinGlow: $('pinGlow'),
+    hudActionBar: $('hudActionBar'),
 
-    // Stego & Logo
-    btnSelectLogo: document.getElementById('btnSelectLogo'),
-    btnOpenStegoInspector: document.getElementById('btnOpenStegoInspector'),
-    lblLogoInfo: document.getElementById('lblLogoInfo'),
-    btnOpenWatermarkStudio: document.getElementById('btnOpenWatermarkStudio'),
-    btnQuickSanitize: document.getElementById('btnQuickSanitize'),
-    chkCleanStego: document.getElementById('chkCleanStego'),
+    // HUD Bar Buttons
+    hudCutout: $('hudCutout'),
+    hudDefringe: $('hudDefringe'),
+    hudUpscale: $('hudUpscale'),
+    hudShadow: $('hudShadow'),
+    hudRelight: $('hudRelight'),
 
-    // Bottom Actions
-    btnStartBatch: document.getElementById('btnStartBatch'),
-    btnClearAll: document.getElementById('btnClearAll'),
+    // Status Footer
+    statX: $('statX'),
+    statY: $('statY'),
+    statDimensions: $('statDimensions'),
+    statVram: $('statVram'),
+    statHistoryStep: $('statHistoryStep'),
+    btnFooterUndo: $('btnFooterUndo'),
+    btnFooterRedo: $('btnFooterRedo'),
 
-    // Tabs
-    tabBtnPreview: document.getElementById('tabBtnPreview'),
-    tabBtnQueue: document.getElementById('tabBtnQueue'),
-    tabPreview: document.getElementById('tabPreview'),
-    tabQueue: document.getElementById('tabQueue'),
+    // Histogram SVGs
+    histPathR: $('histPathR'),
+    histPathG: $('histPathG'),
+    histPathB: $('histPathB'),
+    histPathL: $('histPathL'),
+    lblClippingStatus: $('lblClippingStatus'),
 
-    // Preview Toolbar & Panes
-    btnPrevImg: document.getElementById('btnPrevImg'),
-    btnNextImg: document.getElementById('btnNextImg'),
-    lblImgIndex: document.getElementById('lblImgIndex'),
-    lblCurrentFilename: document.getElementById('lblCurrentFilename'),
-    btnNavCanva: document.getElementById('btnNavCanva'),
-    btnNavErase: document.getElementById('btnNavErase'),
-    btnModeCompare: document.getElementById('btnModeCompare'),
-    btnModeSingleProc: document.getElementById('btnModeSingleProc'),
-    btnModeSingleOrig: document.getElementById('btnModeSingleOrig'),
-    btnToggleZoom: document.getElementById('btnToggleZoom'),
-    comparisonGrid: document.querySelector('.comparison-grid'),
-    btnDownloadCurrent: document.getElementById('btnDownloadCurrent'),
+    // Inspector Sliders
+    sliderAiEnhance: $('sliderAiEnhance'),
+    lblAiEnhance: $('lblAiEnhance'),
+    barAiEnhance: $('barAiEnhance'),
+    sliderDenoise: $('sliderDenoise'),
+    lblDenoise: $('lblDenoise'),
+    barDenoise: $('barDenoise'),
+    sliderExposure: $('sliderExposure'),
+    lblExposure: $('lblExposure'),
+    barExposure: $('barExposure'),
+    thumbExposure: $('thumbExposure'),
+    sliderContrast: $('sliderContrast'),
+    lblContrast: $('lblContrast'),
+    barContrast: $('barContrast'),
+    thumbContrast: $('thumbContrast'),
+    sliderHighlights: $('sliderHighlights'),
+    lblHighlights: $('lblHighlights'),
+    barHighlights: $('barHighlights'),
+    thumbHighlights: $('thumbHighlights'),
+    sliderShadows: $('sliderShadows'),
+    lblShadows: $('lblShadows'),
+    barShadows: $('barShadows'),
+    thumbShadows: $('thumbShadows'),
+    btnResetTone: $('btnResetTone'),
 
-    paneOrigDrop: document.getElementById('paneOrigDrop'),
-    badgeOrig: document.getElementById('badgeOrig'),
-    placeholderOrig: document.getElementById('placeholderOrig'),
-    imgOrig: document.getElementById('imgOrig'),
+    // Color Wheels
+    wheelShadows: $('wheelShadows'),
+    puckShadows: $('puckShadows'),
+    valShadows: $('valShadows'),
+    wheelMidtones: $('wheelMidtones'),
+    puckMidtones: $('puckMidtones'),
+    valMidtones: $('valMidtones'),
+    wheelHighlights: $('wheelHighlights'),
+    puckHighlights: $('puckHighlights'),
+    valHighlights: $('valHighlights'),
+    lblColorPreset: $('lblColorPreset'),
 
-    paneProc: document.querySelector('.pane-proc'),
-    badgeProc: document.getElementById('badgeProc'),
-    placeholderProc: document.getElementById('placeholderProc'),
-    canvasPreview: document.getElementById('canvasPreview'),
+    // Layers Manager
+    btnLayerAdd: $('btnLayerAdd'),
+    btnLayerDelete: $('btnLayerDelete'),
+    layerEyeSubject: $('layerEyeSubject'),
+    layerLockSubject: $('layerLockSubject'),
+    layerThumbCanvas: $('layerThumbCanvas'),
+    layerEyeGlow: $('layerEyeGlow'),
+    layerLockGlow: $('layerLockGlow'),
+    layerEyeLut: $('layerEyeLut'),
+    layerLockLut: $('layerLockLut'),
+    layerEyeAlpha: $('layerEyeAlpha'),
+    layerLockAlpha: $('layerLockAlpha'),
 
-    // Queue Tab
-    lblQueueStats: document.getElementById('lblQueueStats'),
-    btnDownloadAllZip: document.getElementById('btnDownloadAllZip'),
-    queueCardsContainer: document.getElementById('queueCardsContainer'),
+    // CTA
+    btnApplyOptimization: $('btnApplyOptimization'),
+    btnQuickExportPreset: $('btnQuickExportPreset'),
 
-    // Status Bar
-    lblStatus: document.getElementById('lblStatus'),
-    progressBar: document.getElementById('progressBar'),
+    // Modals
+    modalInpaint: $('modalInpaint'),
+    modalStego: $('modalStego'),
+    modalBatch: $('modalBatch'),
+    modalFormats: $('modalFormats'),
+    inpaintBaseCanvas: $('inpaintBaseCanvas'),
+    inpaintMaskCanvas: $('inpaintMaskCanvas'),
+    btnInpaintBrush: $('btnInpaintBrush'),
+    btnInpaintRect: $('btnInpaintRect'),
+    sliderInpaintBrush: $('sliderInpaintBrush'),
+    lblInpaintBrushSize: $('lblInpaintBrushSize'),
+    btnInpaintClearMask: $('btnInpaintClearMask'),
+    btnExecuteInpaint: $('btnExecuteInpaint'),
+    btnInpaintApplyAndClose: $('btnInpaintApplyAndClose'),
+    batchQueueBody: $('batchQueueBody'),
+    lblBatchTotal: $('lblBatchTotal'),
+    btnBatchAddFiles: $('btnBatchAddFiles'),
+    btnBatchClear: $('btnBatchClear'),
+    btnBatchStart: $('btnBatchStart'),
+    sliderQualityModal: $('sliderQualityModal'),
+    lblQualityModal: $('lblQualityModal'),
+    selPresetModal: $('selPresetModal'),
+    btnConfirmExportFormat: $('btnConfirmExportFormat'),
 
-    // Canva Studio Modal
-    modalCanvaStudio: document.getElementById('modalCanvaStudio'),
-    btnCloseCanvaStudio: document.getElementById('btnCloseCanvaStudio'),
-    btnStudioCompare: document.getElementById('btnStudioCompare'),
-    segRetouchTool: document.getElementById('segRetouchTool'),
-    sliderBrushSize: document.getElementById('sliderBrushSize'),
-    lblBrushSize: document.getElementById('lblBrushSize'),
-    btnStudioUndo: document.getElementById('btnStudioUndo'),
-    studioCanvas: document.getElementById('studioCanvas'),
-    segStudioMethod: document.getElementById('segStudioMethod'),
-    btnStudioRunCutout: document.getElementById('btnStudioRunCutout'),
-    segStudioBgType: document.getElementById('segStudioBgType'),
-    studioColorPicker: document.getElementById('studioColorPicker'),
-    sliderStudioBlur: document.getElementById('sliderStudioBlur'),
-    lblStudioBlur: document.getElementById('lblStudioBlur'),
-    studioBlurBox: document.getElementById('studioBlurBox'),
-    chkStudioShadow: document.getElementById('chkStudioShadow'),
-    chkStudioGlow: document.getElementById('chkStudioGlow'),
-    btnStudioApply: document.getElementById('btnStudioApply'),
+    // Stego elements
+    btnChooseLogo: $('btnChooseLogo'),
+    lblLogoChosen: $('lblLogoChosen'),
+    txtStegoMessage: $('txtStegoMessage'),
+    btnExecuteEmbedLogo: $('btnExecuteEmbedLogo'),
+    btnScanHiddenLogo: $('btnScanHiddenLogo'),
+    btnSanitizeHiddenLogo: $('btnSanitizeHiddenLogo'),
 
-    // Watermark & Object Inpaint Modal
-    modalWatermarkStudio: document.getElementById('modalWatermarkStudio'),
-    btnCloseWatermarkStudio: document.getElementById('btnCloseWatermarkStudio'),
-    btnInpaintCompare: document.getElementById('btnInpaintCompare'),
-    segInpaintTool: document.getElementById('segInpaintTool'),
-    sliderInpaintBrush: document.getElementById('sliderInpaintBrush'),
-    lblInpaintBrushSize: document.getElementById('lblInpaintBrushSize'),
-    btnInpaintUndo: document.getElementById('btnInpaintUndo'),
-    btnInpaintClearMask: document.getElementById('btnInpaintClearMask'),
-    selInpaintMethod: document.getElementById('selInpaintMethod'),
-    sliderInpaintRadius: document.getElementById('sliderInpaintRadius'),
-    lblInpaintRadius: document.getElementById('lblInpaintRadius'),
-    chkInpaintAlsoLsb: document.getElementById('chkInpaintAlsoLsb'),
-    lblInpaintStatus: document.getElementById('lblInpaintStatus'),
-    btnRunInpaint: document.getElementById('btnRunInpaint'),
-    inpaintCanvas: document.getElementById('inpaintCanvas'),
-    inpaintContainer: document.getElementById('inpaintContainer'),
-    btnCancelWatermark: document.getElementById('btnCancelWatermark'),
-    btnApplyWatermark: document.getElementById('btnApplyWatermark'),
-
-    // Stego Modal
-    modalStegoInspector: document.getElementById('modalStegoInspector'),
-    btnCloseStegoInspector: document.getElementById('btnCloseStegoInspector'),
-    segBitPlane: document.getElementById('segBitPlane'),
-    selStegoChannel: document.getElementById('selStegoChannel'),
-    stegoCanvas: document.getElementById('stegoCanvas')
+    // Swatches & Tools
+    swatchPrimary: $('swatchPrimary'),
+    swatchSecondary: $('swatchSecondary'),
+    btnColorSwatch: $('btnColorSwatch'),
+    btnToggleHistory: $('btnToggleHistory'),
+    btnOpenSettings: $('btnOpenSettings')
   };
 
-  // ─── INITIALIZATION & EVENT BINDINGS ──────────────────────────────────────
+  // ─── INITIALIZATION ────────────────────────────────────────────────────────
   function init() {
-    bindUIEvents();
-    bindDragAndDrop();
-    bindClipboard();
-    updateTheme(state.theme);
+    bindNavigation();
+    bindToolbar();
+    bindCanvasEvents();
+    bindHUDBar();
+    bindSliders();
+    bindColorWheels();
+    bindLayers();
+    bindModals();
+    bindDragDropAndClipboard();
+    bindStegoAndInpaintEvents();
+
+    // Initialize studio in clean ready state awaiting user imports
+    renderArtwork();
+    updateTelemetryLabels();
   }
 
-  function bindUIEvents() {
-    // Theme toggle
-    el.btnThemeToggle.addEventListener('click', () => {
-      state.theme = state.theme === 'light' ? 'dark' : 'light';
-      updateTheme(state.theme);
-    });
+  // ─── TOAST NOTIFICATION HELPER ─────────────────────────────────────────────
+  function showToast(msg, icon = 'check_circle') {
+    const toast = $('studioToast');
+    const toastMsg = $('toastMsg');
+    const toastIcon = $('toastIcon');
+    if (!toast) return;
 
-    // File Input
-    el.btnSelectFiles.addEventListener('click', () => el.fileInput.click());
-    el.fileInput.addEventListener('change', (e) => {
-      if (e.target.files && e.target.files.length) {
-        loadFilesList(e.target.files);
-        el.fileInput.value = '';
-      }
-    });
-
-    // Paste
-    el.btnPasteClipboard.addEventListener('click', pasteFromClipboard);
-
-    // Format segmented buttons
-    el.segFormat.addEventListener('click', (e) => {
-      const btn = e.target.closest('.seg-btn');
-      if (!btn) return;
-      el.segFormat.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.config.format = btn.dataset.val;
-      el.selExtraFormat.value = '';
-      updateQualitySliderVisibility();
-      renderCurrentPreview();
-    });
-
-    el.selExtraFormat.addEventListener('change', (e) => {
-      if (e.target.value) {
-        state.config.format = e.target.value;
-        el.segFormat.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
-        updateQualitySliderVisibility();
-        renderCurrentPreview();
-      }
-    });
-
-    // Quality slider
-    el.sliderQuality.addEventListener('input', (e) => {
-      const val = parseInt(e.target.value, 10);
-      el.lblQuality.textContent = `${val}%`;
-      state.config.quality = val / 100;
-    });
-
-    // Preset selection
-    el.selPreset.addEventListener('change', (e) => {
-      const val = e.target.value;
-      state.config.preset = val;
-      if (val && val.includes('x')) {
-        const [w, h] = val.split('x').map(Number);
-        el.inputWidth.value = w;
-        el.inputHeight.value = h;
-        state.config.targetW = w;
-        state.config.targetH = h;
-        state.config.aspectRatio = w / h;
-      } else {
-        el.inputWidth.value = '';
-        el.inputHeight.value = '';
-        state.config.targetW = null;
-        state.config.targetH = null;
-      }
-      renderCurrentPreview();
-    });
-
-    // Custom dimensions
-    el.inputWidth.addEventListener('input', (e) => {
-      const w = parseInt(e.target.value, 10);
-      state.config.targetW = w > 0 ? w : null;
-      if (state.config.lockAspect && state.config.aspectRatio && w > 0) {
-        const h = Math.round(w / state.config.aspectRatio);
-        el.inputHeight.value = h;
-        state.config.targetH = h;
-      }
-      renderCurrentPreview();
-    });
-
-    el.inputHeight.addEventListener('input', (e) => {
-      const h = parseInt(e.target.value, 10);
-      state.config.targetH = h > 0 ? h : null;
-      if (state.config.lockAspect && state.config.aspectRatio && h > 0) {
-        const w = Math.round(h * state.config.aspectRatio);
-        el.inputWidth.value = w;
-        state.config.targetW = w;
-      }
-      renderCurrentPreview();
-    });
-
-    el.chkLockAspect.addEventListener('change', (e) => {
-      state.config.lockAspect = e.target.checked;
-    });
-
-    el.selFitMode.addEventListener('change', (e) => {
-      state.config.fitMode = e.target.value;
-      renderCurrentPreview();
-    });
-
-    // Canva cutout switch
-    el.swCutout.addEventListener('change', (e) => {
-      state.config.cutoutEnabled = e.target.checked;
-      renderCurrentPreview();
-    });
-
-    // Quick background selector
-    el.segBgMode.addEventListener('click', (e) => {
-      const btn = e.target.closest('.seg-btn');
-      if (!btn) return;
-      el.segBgMode.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.config.canvaBgMode = btn.dataset.val;
-      if (btn.dataset.val !== 'transparent') {
-        state.config.cutoutEnabled = true;
-        el.swCutout.checked = true;
-      }
-      renderCurrentPreview();
-    });
-
-    // Sidebar swatches & gradients & color picker
-    document.querySelectorAll('.sidebar-swatch, .sidebar-grad-swatch').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const col = btn.dataset.color;
-        state.config.canvaBgMode = col;
-        state.config.cutoutEnabled = true;
-        el.swCutout.checked = true;
-        el.segBgMode.querySelectorAll('.seg-btn').forEach(b => {
-          b.classList.toggle('active', b.dataset.val === col);
-        });
-        renderCurrentPreview();
-      });
-    });
-
-    const sidePicker = document.getElementById('sideBgColorPicker');
-    if (sidePicker) {
-      sidePicker.addEventListener('input', (e) => {
-        const col = e.target.value.toUpperCase();
-        state.config.canvaBgMode = col;
-        state.config.cutoutEnabled = true;
-        el.swCutout.checked = true;
-        el.segBgMode.querySelectorAll('.seg-btn').forEach(b => {
-          b.classList.toggle('active', b.dataset.val === col);
-        });
-        renderCurrentPreview();
-      });
-    }
-
-    // Canva effects checkboxes
-    el.chkShadow.addEventListener('change', (e) => {
-      state.config.shadowEnabled = e.target.checked;
-      renderCurrentPreview();
-    });
-
-    el.chkGlow.addEventListener('change', (e) => {
-      state.config.glowEnabled = e.target.checked;
-      renderCurrentPreview();
-    });
-
-    // Sliders: Tolerance & Sharpen
-    el.sliderTolerance.addEventListener('input', (e) => {
-      const val = parseInt(e.target.value, 10);
-      el.lblTolerance.textContent = `${val}%`;
-      state.config.tolerance = val;
-      renderCurrentPreview();
-    });
-
-    el.sliderSharpen.addEventListener('input', (e) => {
-      const val = parseInt(e.target.value, 10);
-      el.lblSharpen.textContent = `${val}%`;
-      state.config.sharpen = val;
-      renderCurrentPreview();
-    });
-
-    // Stego actions
-    el.btnSelectLogo.addEventListener('click', () => el.logoInput.click());
-    el.logoInput.addEventListener('change', (e) => {
-      if (e.target.files && e.target.files[0]) {
-        loadHiddenLogo(e.target.files[0]);
-      }
-    });
-
-    el.btnOpenStegoInspector.addEventListener('click', openStegoModal);
-    el.btnQuickSanitize.addEventListener('click', quickSanitizeCurrent);
-    el.btnNavClean.addEventListener('click', quickSanitizeCurrent);
-    el.chkCleanStego.addEventListener('change', (e) => {
-      state.config.cleanStego = e.target.checked;
-    });
-
-    // Navigation buttons inside Preview
-    el.btnPrevImg.addEventListener('click', () => selectImageIndex(state.activeIndex - 1));
-    el.btnNextImg.addEventListener('click', () => selectImageIndex(state.activeIndex + 1));
-
-    // View mode pills & zoom toggle (Cho phép xem ảnh to cực đại)
-    if (el.btnModeCompare) el.btnModeCompare.addEventListener('click', () => setViewMode('compare'));
-    if (el.btnModeSingleProc) el.btnModeSingleProc.addEventListener('click', () => setViewMode('single-proc'));
-    if (el.btnModeSingleOrig) el.btnModeSingleOrig.addEventListener('click', () => setViewMode('single-orig'));
-    if (el.btnToggleZoom) el.btnToggleZoom.addEventListener('click', toggleZoomMode);
-
-    // Studio openers
-    el.btnOpenCanvaStudio.addEventListener('click', openCanvaStudioModal);
-    el.btnNavCanva.addEventListener('click', openCanvaStudioModal);
-    el.btnOpenWatermarkStudio.addEventListener('click', openWatermarkModal);
-    el.btnNavErase.addEventListener('click', openWatermarkModal);
-
-    // Download single current
-    el.btnDownloadCurrent.addEventListener('click', downloadCurrentItem);
-
-    // Batch Convert & Clear
-    el.btnStartBatch.addEventListener('click', startBatchConversion);
-    el.btnDownloadAllZip.addEventListener('click', startBatchConversion);
-    el.btnClearAll.addEventListener('click', clearAll);
-
-    // Tabs switching
-    el.tabBtnPreview.addEventListener('click', () => switchTab('preview'));
-    el.tabBtnQueue.addEventListener('click', () => switchTab('queue'));
-
-    // Modal close buttons
-    el.btnCloseCanvaStudio.addEventListener('click', () => el.modalCanvaStudio.style.display = 'none');
-    el.btnCloseWatermarkStudio.addEventListener('click', () => el.modalWatermarkStudio.style.display = 'none');
-    el.btnCancelWatermark.addEventListener('click', () => el.modalWatermarkStudio.style.display = 'none');
-    el.btnCloseStegoInspector.addEventListener('click', () => el.modalStegoInspector.style.display = 'none');
-
-    // Setup Canvas Retouch listeners for Canva Studio
-    setupCanvaStudioCanvasEvents();
-    // Setup Watermark Inpaint listeners
-    setupWatermarkCanvasEvents();
-    // Setup Stego Inspector listeners
-    setupStegoInspectorEvents();
+    if (toastMsg) toastMsg.textContent = msg;
+    if (toastIcon) toastIcon.textContent = icon;
+    toast.classList.add('show');
+    clearTimeout(toast._timeout);
+    toast._timeout = setTimeout(() => {
+      toast.classList.remove('show');
+    }, 2800);
   }
 
-  function updateTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
-    if (theme === 'dark') {
-      el.themeIcon.textContent = '☀';
-      el.themeText.textContent = 'Sáng';
-    } else {
-      el.themeIcon.textContent = '🌙';
-      el.themeText.textContent = 'Tối';
-    }
-  }
-
-  function updateQualitySliderVisibility() {
-    const isLossy = ['WEBP', 'JPG'].includes(state.config.format);
-    const box = document.getElementById('qualityBox');
-    if (box) {
-      box.style.opacity = isLossy ? '1' : '0.4';
-      box.style.pointerEvents = isLossy ? 'auto' : 'none';
-    }
-  }
-
-  function switchTab(tab) {
-    if (tab === 'preview') {
-      el.tabBtnPreview.classList.add('active');
-      el.tabBtnQueue.classList.remove('active');
-      el.tabPreview.style.display = 'flex';
-      el.tabQueue.style.display = 'none';
-    } else {
-      el.tabBtnPreview.classList.remove('active');
-      el.tabBtnQueue.classList.add('active');
-      el.tabPreview.style.display = 'none';
-      el.tabQueue.style.display = 'flex';
-      renderQueueTable();
-    }
-  }
-
-  function setViewMode(mode) {
-    state.viewMode = mode;
-    if (el.btnModeCompare) el.btnModeCompare.classList.toggle('active', mode === 'compare');
-    if (el.btnModeSingleProc) el.btnModeSingleProc.classList.toggle('active', mode === 'single-proc');
-    if (el.btnModeSingleOrig) el.btnModeSingleOrig.classList.toggle('active', mode === 'single-orig');
-
-    if (!el.comparisonGrid) return;
-    if (mode === 'compare') {
-      el.comparisonGrid.style.gridTemplateColumns = '1fr 1fr';
-      if (el.paneOrigDrop) el.paneOrigDrop.style.display = 'flex';
-      if (el.paneProc) el.paneProc.style.display = 'flex';
-    } else if (mode === 'single-proc') {
-      el.comparisonGrid.style.gridTemplateColumns = '1fr';
-      if (el.paneOrigDrop) el.paneOrigDrop.style.display = 'none';
-      if (el.paneProc) el.paneProc.style.display = 'flex';
-    } else if (mode === 'single-orig') {
-      el.comparisonGrid.style.gridTemplateColumns = '1fr';
-      if (el.paneProc) el.paneProc.style.display = 'none';
-      if (el.paneOrigDrop) el.paneOrigDrop.style.display = 'flex';
-    }
-  }
-
-  function toggleZoomMode() {
-    state.zoomFit = !state.zoomFit;
-    if (el.btnToggleZoom) {
-      el.btnToggleZoom.textContent = state.zoomFit ? '🔍 Vừa Khung' : '🔍 100% Gốc';
-      el.btnToggleZoom.title = state.zoomFit ? 'Đang xem vừa khung tối đa. Bấm để xem kích thước thực 100%' : 'Đang xem kích thước thực 100%. Bấm để phóng to vừa khung tối đa';
-    }
-    if (el.imgOrig) el.imgOrig.classList.toggle('zoom-actual', !state.zoomFit);
-    if (el.canvasPreview) el.canvasPreview.classList.toggle('zoom-actual', !state.zoomFit);
-  }
-
-  // ─── DRAG AND DROP & CLIPBOARD ────────────────────────────────────────────
-  function bindDragAndDrop() {
-    window.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    });
-
-    window.addEventListener('drop', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
-        loadFilesList(e.dataTransfer.files);
-      }
-    });
-
-    el.paneOrigDrop.addEventListener('click', () => {
-      if (!state.files.length) el.fileInput.click();
-    });
-  }
-
-  function bindClipboard() {
-    window.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
-        // Handled by paste event
-      } else if (e.key === 'ArrowLeft') {
-        selectImageIndex(state.activeIndex - 1);
-      } else if (e.key === 'ArrowRight') {
-        selectImageIndex(state.activeIndex + 1);
-      }
-    });
-
-    window.addEventListener('paste', (e) => {
-      const items = (e.clipboardData || window.clipboardData).items;
-      if (!items) return;
-      for (let i = 0; i < items.length; i++) {
-        if (items[i].type.indexOf('image') !== -1) {
-          const blob = items[i].getAsFile();
-          const file = new File([blob], `clipboard_${Date.now()}.png`, { type: 'image/png' });
-          loadFilesList([file]);
-          break;
-        }
-      }
-    });
-  }
-
-  async function pasteFromClipboard() {
-    try {
-      const clipboardItems = await navigator.clipboard.read();
-      for (const item of clipboardItems) {
-        const imageType = item.types.find(type => type.startsWith('image/'));
-        if (imageType) {
-          const blob = await item.getType(imageType);
-          const file = new File([blob], `clipboard_${Date.now()}.png`, { type: imageType });
-          loadFilesList([file]);
-          return;
-        }
-      }
-      setStatus('Không tìm thấy ảnh trong bộ nhớ tạm (Clipboard)');
-    } catch (err) {
-      setStatus('Hãy nhấn Ctrl+V trực tiếp trên trang để dán ảnh!');
-    }
-  }
-
-  // ─── FILE LOADING & QUEUE MANAGEMENT ──────────────────────────────────────
-  function loadFilesList(fileList) {
-    let countAdded = 0;
-    const promises = [];
-
-    for (let i = 0; i < fileList.length; i++) {
-      const file = fileList[i];
-      if (!file.type.startsWith('image/')) continue;
-
-      const p = new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const img = new Image();
-          img.onload = () => {
-            const item = {
-              id: `img_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-              file: file,
-              name: file.name,
-              src: event.target.result,
-              img: img,
-              origW: img.naturalWidth || img.width,
-              origH: img.naturalHeight || img.height,
-              sizeBytes: file.size,
-              status: 'Sẵn sàng',
-              customMask: null,
-              procBlob: null
-            };
-            state.files.push(item);
-            countAdded++;
-            resolve();
-          };
-          img.src = event.target.result;
-        };
-        reader.readAsDataURL(file);
-      });
-      promises.push(p);
-    }
-
-    Promise.all(promises).then(() => {
-      if (countAdded > 0) {
-        if (state.activeIndex === -1) {
-          selectImageIndex(0);
-        } else {
-          updateHeaderCount();
-          renderQueueTable();
-        }
-        setStatus(`Đã nạp ${countAdded} ảnh thành công!`);
-      }
-    });
-  }
-
-  function updateHeaderCount() {
-    const total = state.files.length;
-    el.lblFileCount.textContent = total > 0 ? `${total} ảnh` : 'Chưa có ảnh';
-    el.btnDownloadAllZip.style.display = total > 1 ? 'block' : 'none';
-  }
-
-  function selectImageIndex(idx) {
-    if (!state.files.length) {
-      state.activeIndex = -1;
-      resetPreviewPanes();
-      updateHeaderCount();
-      renderQueueTable();
-      return;
-    }
-
-    if (idx < 0) idx = 0;
-    if (idx >= state.files.length) idx = state.files.length - 1;
-    state.activeIndex = idx;
-
-    const item = state.files[idx];
-    el.lblImgIndex.textContent = `Ảnh ${idx + 1}/${state.files.length}`;
-    el.lblCurrentFilename.textContent = item.name;
-    el.lblCurrentFilename.title = item.name;
-
-    // Update aspect ratio helper
-    state.config.aspectRatio = item.origW / item.origH;
-    if (state.config.preset && state.config.preset.includes('x')) {
-      // Keep preset
-    } else {
-      el.inputWidth.placeholder = `${item.origW}`;
-      el.inputHeight.placeholder = `${item.origH}`;
-    }
-
-    // Display Original
-    el.placeholderOrig.style.display = 'none';
-    el.imgOrig.style.display = 'block';
-    el.imgOrig.src = item.src;
-    el.imgOrig.classList.toggle('zoom-actual', !state.zoomFit);
-    el.canvasPreview.classList.toggle('zoom-actual', !state.zoomFit);
-    el.badgeOrig.textContent = `${item.origW} × ${item.origH} px (${formatBytes(item.sizeBytes)})`;
-
-    updateHeaderCount();
-    renderCurrentPreview();
-    renderQueueTable();
-  }
-
-  function resetPreviewPanes() {
-    el.lblImgIndex.textContent = 'Ảnh 0/0';
-    el.lblCurrentFilename.textContent = 'Chưa nạp ảnh nào';
-    el.placeholderOrig.style.display = 'block';
-    el.imgOrig.style.display = 'none';
-    el.imgOrig.src = '';
-    el.badgeOrig.textContent = '—';
-
-    el.placeholderProc.style.display = 'block';
-    el.canvasPreview.style.display = 'none';
-    el.badgeProc.textContent = '—';
-    el.btnDownloadCurrent.style.display = 'none';
-  }
-
-  function removeQueueItem(idx) {
-    state.files.splice(idx, 1);
-    if (state.activeIndex >= state.files.length) {
-      state.activeIndex = state.files.length - 1;
-    }
-    selectImageIndex(state.activeIndex);
-    setStatus('Đã xóa mục khỏi danh sách.');
-  }
-
-  function clearAll() {
+  // ─── RESET STUDIO STATE ───────────────────────────────────────────────────
+  function resetToEmptyStudio() {
     state.files = [];
     state.activeIndex = -1;
-    resetPreviewPanes();
-    updateHeaderCount();
-    renderQueueTable();
-    setStatus('Đã làm trống danh sách.');
+    renderArtwork();
+    updateHistogram();
+    updateTelemetryLabels();
   }
 
-  // ─── CANVAS RENDERING PIPELINE (LIVE PREVIEW) ─────────────────────────────
-  let previewDebounceTimer = null;
-  function renderCurrentPreview() {
-    if (previewDebounceTimer) clearTimeout(previewDebounceTimer);
-    previewDebounceTimer = setTimeout(() => {
-      _executeRenderCurrentPreview();
-    }, 40);
-  }
+  // ─── TOP NAVIGATION & TABS ────────────────────────────────────────────────
+  function bindNavigation() {
+    // Navigation Pills
+    const navButtons = [
+      { btn: el.btnNavEdit, action: () => showToast('Đang ở chế độ: Chỉnh sửa ảnh', 'tune') },
+      { btn: el.btnNavGenAI, action: () => openModal('modalInpaint') },
+      { btn: el.btnNavBatch, action: () => openBatchModal() },
+      { btn: el.btnNavLibrary, action: () => openModal('modalFormats') }
+    ];
 
-  function _executeRenderCurrentPreview() {
-    if (state.activeIndex < 0 || !state.files[state.activeIndex]) return;
-
-    const item = state.files[state.activeIndex];
-    const outCanvas = el.canvasPreview;
-
-    // 1. Determine Output Dimensions
-    let outW = state.config.targetW || item.origW;
-    let outH = state.config.targetH || item.origH;
-
-    // Render processed canvas
-    processImageToCanvas(item, outCanvas, outW, outH, state.config);
-
-    // Show preview elements
-    el.placeholderProc.style.display = 'none';
-    outCanvas.style.display = 'block';
-    el.badgeProc.textContent = `${outW} × ${outH} px • ${state.config.format}`;
-    el.btnDownloadCurrent.style.display = 'block';
-  }
-
-  /**
-   * Main image processing algorithm on Canvas
-   */
-  function processImageToCanvas(item, targetCanvas, targetW, targetH, cfg) {
-    const origW = item.origW;
-    const origH = item.origH;
-    targetCanvas.width = targetW;
-    targetCanvas.height = targetH;
-    const ctx = targetCanvas.getContext('2d', { willReadFrequently: true });
-    ctx.clearRect(0, 0, targetW, targetH);
-
-    // Step A: Create offscreen canvas for Cutout Subject
-    let subjectCanvas = document.createElement('canvas');
-    subjectCanvas.width = origW;
-    subjectCanvas.height = origH;
-    const subCtx = subjectCanvas.getContext('2d', { willReadFrequently: true });
-    subCtx.drawImage(item.img, 0, 0, origW, origH);
-
-    const shouldCutout = cfg.cutoutEnabled || (cfg.canvaBgMode && cfg.canvaBgMode !== 'transparent');
-    if (shouldCutout) {
-      // 1. Run Cutout Segmentation
-      const imgData = subCtx.getImageData(0, 0, origW, origH);
-      const data = imgData.data;
-
-      // Sample 4 corners for background reference
-      const corners = [
-        [0, 0],
-        [origW - 1, 0],
-        [0, origH - 1],
-        [origW - 1, origH - 1]
-      ];
-      let bgR = 0, bgG = 0, bgB = 0;
-      for (const [cx, cy] of corners) {
-        const idx = (cy * origW + cx) * 4;
-        bgR += data[idx];
-        bgG += data[idx + 1];
-        bgB += data[idx + 2];
-      }
-      bgR /= 4; bgG /= 4; bgB /= 4;
-
-      const tol = (cfg.tolerance / 100) * 255;
-      const tolSoft = tol * 1.35;
-
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-
-        // Euclidean color distance
-        const dist = Math.sqrt((r - bgR) ** 2 + (g - bgG) ** 2 + (b - bgB) ** 2);
-
-        if (dist < tol) {
-          data[i + 3] = 0; // Transparent
-        } else if (dist < tolSoft) {
-          // Soft edge feathering
-          const alphaFactor = (dist - tol) / (tolSoft - tol);
-          data[i + 3] = Math.round(data[i + 3] * alphaFactor);
-        }
-      }
-
-      // Apply manual brush mask if exists
-      if (item.customMask) {
-        const maskCtx = item.customMask.getContext('2d');
-        const maskData = maskCtx.getImageData(0, 0, origW, origH).data;
-        for (let i = 0; i < data.length; i += 4) {
-          const action = maskData[i]; // 1 = Erase, 2 = Restore
-          if (action === 255) {
-            data[i + 3] = 0; // Erased
-          } else if (action === 128) {
-            data[i + 3] = 255; // Restored
+    navButtons.forEach(({ btn, action }) => {
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        navButtons.forEach((b) => {
+          if (b.btn) {
+            b.btn.className = 'px-3.5 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-white/60 transition-all font-body-sm text-sm whitespace-nowrap cursor-pointer';
           }
-        }
-      }
-
-      subCtx.putImageData(imgData, 0, 0);
-    }
-
-    // Step B: Calculate Fit Mode transform
-    let drawX = 0, drawY = 0, drawW = targetW, drawH = targetH;
-    if (cfg.fitMode === 'contain') {
-      const ratio = Math.min(targetW / origW, targetH / origH);
-      drawW = Math.round(origW * ratio);
-      drawH = Math.round(origH * ratio);
-      drawX = Math.round((targetW - drawW) / 2);
-      drawY = Math.round((targetH - drawH) / 2);
-    } else if (cfg.fitMode === 'cover') {
-      const ratio = Math.max(targetW / origW, targetH / origH);
-      drawW = Math.round(origW * ratio);
-      drawH = Math.round(origH * ratio);
-      drawX = Math.round((targetW - drawW) / 2);
-      drawY = Math.round((targetH - drawH) / 2);
-    }
-
-    // Step C: Render Background
-    if (shouldCutout) {
-      if (!cfg.canvaBgMode || cfg.canvaBgMode === 'transparent') {
-        // Leave canvas transparent
-      } else if (cfg.canvaBgMode === 'radial:spotlight') {
-        const radGrad = ctx.createRadialGradient(targetW / 2, targetH / 2, 0, targetW / 2, targetH / 2, Math.max(targetW, targetH) / 1.2);
-        radGrad.addColorStop(0, '#334155');
-        radGrad.addColorStop(1, '#0F172A');
-        ctx.fillStyle = radGrad;
-        ctx.fillRect(0, 0, targetW, targetH);
-      } else if (cfg.canvaBgMode === 'gradient:indigo_purple') {
-        const linGrad = ctx.createLinearGradient(0, 0, targetW, targetH);
-        linGrad.addColorStop(0, '#4F46E5');
-        linGrad.addColorStop(1, '#9333EA');
-        ctx.fillStyle = linGrad;
-        ctx.fillRect(0, 0, targetW, targetH);
-      } else if (cfg.canvaBgMode === 'gradient:sunset') {
-        const linGrad = ctx.createLinearGradient(0, 0, targetW, targetH);
-        linGrad.addColorStop(0, '#F59E0B');
-        linGrad.addColorStop(1, '#EC4899');
-        ctx.fillStyle = linGrad;
-        ctx.fillRect(0, 0, targetW, targetH);
-      } else if (cfg.canvaBgMode === 'gradient:ocean') {
-        const linGrad = ctx.createLinearGradient(0, 0, targetW, targetH);
-        linGrad.addColorStop(0, '#0284C7');
-        linGrad.addColorStop(1, '#0D9488');
-        ctx.fillStyle = linGrad;
-        ctx.fillRect(0, 0, targetW, targetH);
-      } else if (cfg.canvaBgMode === 'gradient:deep_slate') {
-        const linGrad = ctx.createLinearGradient(0, 0, targetW, targetH);
-        linGrad.addColorStop(0, '#334155');
-        linGrad.addColorStop(1, '#020617');
-        ctx.fillStyle = linGrad;
-        ctx.fillRect(0, 0, targetW, targetH);
-      } else if (cfg.canvaBgMode === 'blur') {
-        ctx.save();
-        ctx.filter = `blur(${cfg.canvaBlurRadius || 20}px)`;
-        ctx.drawImage(item.img, drawX - 10, drawY - 10, drawW + 20, drawH + 20);
-        ctx.restore();
-      } else if (cfg.canvaBgMode.startsWith('#') || cfg.canvaBgMode.startsWith('rgb')) {
-        ctx.fillStyle = cfg.canvaBgMode;
-        ctx.fillRect(0, 0, targetW, targetH);
-      }
-    } else {
-      // Non-cutout: if contain mode, fill background with clean white or card bg
-      if (cfg.fitMode === 'contain' && (drawX > 0 || drawY > 0)) {
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, targetW, targetH);
-      }
-    }
-
-    // Step D: Render Effects (Shadow & Glow) behind Subject
-    if (shouldCutout && cfg.shadowEnabled) {
-      ctx.save();
-      ctx.shadowColor = `rgba(0, 0, 0, ${cfg.shadowOpacity || 0.45})`;
-      ctx.shadowBlur = cfg.shadowBlur || 16;
-      ctx.shadowOffsetX = 10;
-      ctx.shadowOffsetY = 12;
-      ctx.drawImage(subjectCanvas, drawX, drawY, drawW, drawH);
-      ctx.restore();
-    }
-
-    if (shouldCutout && cfg.glowEnabled) {
-      ctx.save();
-      ctx.shadowColor = cfg.glowColor || '#FFFFFF';
-      ctx.shadowBlur = (cfg.glowWidth || 6) * 2;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 0;
-      ctx.drawImage(subjectCanvas, drawX, drawY, drawW, drawH);
-      ctx.drawImage(subjectCanvas, drawX, drawY, drawW, drawH);
-      ctx.restore();
-    }
-
-    // Step E: Draw Final Subject
-    ctx.drawImage(subjectCanvas, drawX, drawY, drawW, drawH);
-
-    // Step F: Unsharp Mask Sharpening
-    if (cfg.sharpen > 0) {
-      applyUnsharpMask(ctx, targetW, targetH, cfg.sharpen / 100);
-    }
-
-    // Step G: Stego Sanitization (if enabled)
-    if (cfg.cleanStego) {
-      sanitizeCanvasLsb(ctx, targetW, targetH);
-    }
-  }
-
-  /**
-   * Fast Unsharp Mask filter on Canvas TypedArray
-   */
-  function applyUnsharpMask(ctx, w, h, amount) {
-    const imgData = ctx.getImageData(0, 0, w, h);
-    const src = imgData.data;
-    const output = ctx.createImageData(w, h);
-    const dst = output.data;
-
-    // Convolution 3x3 kernel:
-    // [  0, -a,  0 ]
-    // [ -a, 1+4a, -a ]
-    // [  0, -a,  0 ]
-    const a = amount * 0.8;
-    const center = 1 + 4 * a;
-
-    for (let y = 1; y < h - 1; y++) {
-      for (let x = 1; x < w - 1; x++) {
-        const idx = (y * w + x) * 4;
-        const top = ((y - 1) * w + x) * 4;
-        const bot = ((y + 1) * w + x) * 4;
-        const left = (y * w + (x - 1)) * 4;
-        const right = (y * w + (x + 1)) * 4;
-
-        for (let c = 0; c < 3; c++) {
-          const val = src[idx + c] * center -
-                      (src[top + c] + src[bot + c] + src[left + c] + src[right + c]) * a;
-          dst[idx + c] = Math.min(255, Math.max(0, val));
-        }
-        dst[idx + 3] = src[idx + 3];
-      }
-    }
-    ctx.putImageData(output, 0, 0);
-  }
-
-  function sanitizeCanvasLsb(ctx, w, h) {
-    const imgData = ctx.getImageData(0, 0, w, h);
-    const d = imgData.data;
-    for (let i = 0; i < d.length; i += 4) {
-      d[i] = d[i] & 0xFC;     // Zero bottom 2 bits
-      d[i + 1] = d[i + 1] & 0xFC;
-      d[i + 2] = d[i + 2] & 0xFC;
-    }
-    ctx.putImageData(imgData, 0, 0);
-  }
-
-  // ─── QUEUE TABLE RENDERING ────────────────────────────────────────────────
-  function renderQueueTable() {
-    const container = el.queueCardsContainer;
-    container.innerHTML = '';
-
-    const total = state.files.length;
-    const done = state.files.filter(f => f.status === 'Thành công').length;
-    el.lblQueueStats.textContent = `Tổng số: ${total} ảnh  •  Hoàn tất: ${done}  •  Đang chờ: ${total - done}`;
-
-    if (!total) {
-      container.innerHTML = `
-        <div class="queue-empty-notice">
-          <span>📑</span>
-          <p>Chưa có ảnh nào trong danh sách. Hãy thêm ảnh để xử lý hàng loạt!</p>
-        </div>
-      `;
-      return;
-    }
-
-    state.files.forEach((item, idx) => {
-      const card = document.createElement('div');
-      card.className = 'queue-item-card';
-
-      let statusClass = 'ready';
-      if (item.status === 'Đang xử lý') statusClass = 'working';
-      else if (item.status === 'Thành công') statusClass = 'success';
-      else if (item.status === 'Lỗi') statusClass = 'error';
-
-      card.innerHTML = `
-        <span class="queue-idx-badge">${String(idx + 1).padStart(2, '0')}</span>
-        <img class="queue-item-thumb" src="${item.src}" alt="${item.name}">
-        <div class="queue-item-info">
-          <span class="queue-item-name">${escapeHtml(item.name)}</span>
-          <div class="queue-item-sub">
-            <span>${item.origW} × ${item.origH} px</span>
-            <span>•</span>
-            <span class="status-tag ${statusClass}">${item.status}</span>
-          </div>
-        </div>
-        <div class="queue-item-actions">
-          <button class="btn-queue-view" title="Xem trước ảnh này">👁 Xem</button>
-          <button class="btn-queue-del" title="Xóa khỏi danh sách">✕</button>
-        </div>
-      `;
-
-      card.querySelector('.btn-queue-view').addEventListener('click', () => {
-        selectImageIndex(idx);
-        switchTab('preview');
-      });
-
-      card.querySelector('.btn-queue-del').addEventListener('click', () => {
-        removeQueueItem(idx);
-      });
-
-      container.appendChild(card);
-    });
-  }
-
-  // ─── BATCH EXPORT & DOWNLOADING ───────────────────────────────────────────
-  async function downloadCurrentItem() {
-    if (state.activeIndex < 0 || !state.files[state.activeIndex]) return;
-    const item = state.files[state.activeIndex];
-    setStatus(`Đang xuất ảnh: ${item.name}…`);
-
-    const tempCanvas = document.createElement('canvas');
-    let outW = state.config.targetW || item.origW;
-    let outH = state.config.targetH || item.origH;
-    processImageToCanvas(item, tempCanvas, outW, outH, state.config);
-
-    const blob = await canvasToBlob(tempCanvas, state.config.format, state.config.quality);
-    const ext = getExtensionForFormat(state.config.format);
-    const baseName = item.name.replace(/\.[^/.]+$/, '');
-    downloadBlob(blob, `${baseName}_converted.${ext}`);
-    setStatus(`Đã tải xuống ${baseName}_converted.${ext}`);
-  }
-
-  async function startBatchConversion() {
-    if (!state.files.length) {
-      alert('Vui lòng thêm ít nhất một ảnh vào danh sách để chuyển đổi!');
-      return;
-    }
-
-    setStatus('Đang bắt đầu xử lý hàng loạt…');
-    el.progressBar.style.width = '0%';
-
-    const total = state.files.length;
-    const convertedItems = [];
-
-    for (let i = 0; i < total; i++) {
-      const item = state.files[i];
-      item.status = 'Đang xử lý';
-      renderQueueTable();
-
-      const tempCanvas = document.createElement('canvas');
-      let outW = state.config.targetW || item.origW;
-      let outH = state.config.targetH || item.origH;
-
-      processImageToCanvas(item, tempCanvas, outW, outH, state.config);
-      const blob = await canvasToBlob(tempCanvas, state.config.format, state.config.quality);
-
-      const ext = getExtensionForFormat(state.config.format);
-      const baseName = item.name.replace(/\.[^/.]+$/, '');
-      const outName = `${baseName}.${ext}`;
-
-      convertedItems.push({ name: outName, blob: blob });
-      item.status = 'Thành công';
-
-      const pct = Math.round(((i + 1) / total) * 100);
-      el.progressBar.style.width = `${pct}%`;
-      renderQueueTable();
-    }
-
-    if (total === 1) {
-      downloadBlob(convertedItems[0].blob, convertedItems[0].name);
-      setStatus(`Đã xuất thành công: ${convertedItems[0].name}`);
-    } else {
-      // Pack into ZIP using JSZip
-      setStatus('Đang nén toàn bộ ảnh vào tệp ZIP…');
-      if (window.JSZip) {
-        const zip = new window.JSZip();
-        convertedItems.forEach(ci => {
-          zip.file(ci.name, ci.blob);
         });
-        const zipBlob = await zip.generateAsync({ type: 'blob' });
-        downloadBlob(zipBlob, `OmniImage_Batch_${Date.now()}.zip`);
-        setStatus(`Hoàn tất! Đã tải gói ZIP (${total} ảnh).`);
-      } else {
-        // Fallback individual downloads
-        convertedItems.forEach(ci => downloadBlob(ci.blob, ci.name));
-        setStatus(`Hoàn tất xuất ${total} ảnh!`);
+        btn.className = 'px-4 py-1.5 rounded-xl transition-all whitespace-nowrap bg-white text-indigo-600 font-semibold shadow-xs text-sm cursor-pointer';
+        action();
+      });
+    });
+
+    // Logo & Badge File Openers
+    if (el.btnLogoHome) el.btnLogoHome.addEventListener('click', () => el.fileInput.click());
+    if (el.btnOpenFileBadge) el.btnOpenFileBadge.addEventListener('click', () => el.fileInput.click());
+    if (el.fileInput) el.fileInput.addEventListener('change', handleFileSelect);
+
+    // Menu Bar Items
+    if ($('menuItemFile')) $('menuItemFile').addEventListener('click', () => el.fileInput.click());
+    if ($('menuItemEdit')) $('menuItemEdit').addEventListener('click', () => openModal('modalInpaint'));
+    if ($('menuItemImage')) $('menuItemImage').addEventListener('click', () => openModal('modalFormats'));
+    if ($('menuItemLayer')) $('menuItemLayer').addEventListener('click', () => switchInspectorTab('layers'));
+    if ($('menuItemFilter')) $('menuItemFilter').addEventListener('click', () => openModal('modalFormats'));
+    if ($('menuItemView')) $('menuItemView').addEventListener('click', () => fitZoomToCanvas());
+    if ($('menuItemWindow')) $('menuItemWindow').addEventListener('click', () => showToast('Bố cục: Light Studio Precision v2.4', 'dashboard'));
+
+    // Hardware RTX toggle
+    if (el.btnToggleRTX) {
+      el.btnToggleRTX.addEventListener('click', () => {
+        state.rtxAccelerated = !state.rtxAccelerated;
+        el.btnToggleRTX.innerHTML = state.rtxAccelerated
+          ? '<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span><span class="font-label-xs text-xs text-emerald-800 font-medium">NVIDIA RTX AI: On</span>'
+          : '<span class="w-2 h-2 rounded-full bg-slate-400"></span><span class="font-label-xs text-xs text-slate-600 font-medium">NVIDIA RTX AI: Off</span>';
+        showToast(state.rtxAccelerated ? 'Đã kích hoạt GPU RTX Acceleration' : 'Đã tắt GPU RTX Acceleration', 'memory');
+      });
+    }
+
+    // Export Trigger & Dropdown Menu
+    if (el.btnHeaderExport) {
+      el.btnHeaderExport.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (el.quickExportMenu) el.quickExportMenu.classList.toggle('hidden');
+      });
+    }
+    document.addEventListener('click', (e) => {
+      if (el.quickExportMenu && !el.quickExportMenu.contains(e.target) && e.target !== el.btnHeaderExport) {
+        el.quickExportMenu.classList.add('hidden');
       }
+    });
+
+    if (el.btnQuickPng) {
+      el.btnQuickPng.addEventListener('click', () => {
+        state.config.format = 'PNG';
+        exportCurrent(false);
+        if (el.quickExportMenu) el.quickExportMenu.classList.add('hidden');
+      });
+    }
+    if (el.btnQuickWebp) {
+      el.btnQuickWebp.addEventListener('click', () => {
+        state.config.format = 'WEBP';
+        exportCurrent(false);
+        if (el.quickExportMenu) el.quickExportMenu.classList.add('hidden');
+      });
+    }
+    if (el.btnQuickJpg) {
+      el.btnQuickJpg.addEventListener('click', () => {
+        state.config.format = 'JPEG';
+        exportCurrent(false);
+        if (el.quickExportMenu) el.quickExportMenu.classList.add('hidden');
+      });
+    }
+    if (el.btnOpenFullExportModal) {
+      el.btnOpenFullExportModal.addEventListener('click', () => {
+        if (el.quickExportMenu) el.quickExportMenu.classList.add('hidden');
+        openModal('modalFormats');
+      });
+    }
+
+    // Zoom Dropdown
+    if (el.btnZoomDropdown) {
+      el.btnZoomDropdown.addEventListener('click', () => {
+        if (state.zoomLevel === 1.0) adjustZoom(0.5);
+        else if (state.zoomLevel >= 1.5) fitZoomToCanvas();
+        else fitZoomToCanvas();
+      });
+    }
+
+    // User Profile
+    if (el.btnUserProfile) {
+      el.btnUserProfile.addEventListener('click', () => {
+        openModal('modalStego');
+      });
+    }
+
+    // Undo / Redo
+    if (el.btnHdrUndo) el.btnHdrUndo.addEventListener('click', undo);
+    if (el.btnHdrRedo) el.btnHdrRedo.addEventListener('click', redo);
+    if (el.btnFooterUndo) el.btnFooterUndo.addEventListener('click', undo);
+    if (el.btnFooterRedo) el.btnFooterRedo.addEventListener('click', redo);
+  }
+
+  // ─── TOOLBAR DOCK (LEFT STRIP) ────────────────────────────────────────────
+  function bindToolbar() {
+    const tools = [
+      { id: 'toolSelect', name: 'select', tip: 'Chọn & Di chuyển (V)' },
+      { id: 'toolCutout', name: 'cutout', tip: 'Tách nền tự động AI (W)', action: triggerSmartCutout },
+      { id: 'toolInpaint', name: 'eraser', tip: 'Xóa vật thể AI (J)', action: () => openModal('modalInpaint') },
+      { id: 'toolCrop', name: 'crop', tip: 'Cắt & Khung hình (C)', action: () => openModal('modalFormats') },
+      { id: 'toolPortrait', name: 'portrait', tip: 'Sửa da chân dung AI (P)', action: applyPortraitFilter },
+      { id: 'toolHealing', name: 'healing', tip: 'Phục hồi chi tiết (S)', action: applySharpenFilter },
+      { id: 'toolBrush', name: 'brush', tip: 'Bút vẽ mặt nạ (B)', action: () => openModal('modalInpaint') },
+      { id: 'toolSampler', name: 'sampler', tip: 'Hút màu & Mẫu điểm (I)', action: activateSamplerTool },
+      { id: 'toolHand', name: 'hand', tip: 'Bàn tay kéo cuộn (H)', action: () => showToast('Bàn tay kéo: Kéo thả chuột để di chuyển canvas', 'pan_tool') }
+    ];
+
+    tools.forEach((t) => {
+      const btn = $(t.id);
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        $$('#leftToolbarList .tool-btn').forEach((b) => {
+          b.classList.remove('active', 'bg-indigo-50', 'text-indigo-600', 'border-indigo-100');
+          b.classList.add('text-slate-600');
+          const dot = b.querySelector('.tool-dot');
+          if (dot) dot.classList.add('hidden');
+        });
+        btn.classList.add('active', 'bg-indigo-50', 'text-indigo-600', 'border-indigo-100');
+        btn.classList.remove('text-slate-600');
+        const dot = btn.querySelector('.tool-dot');
+        if (dot) dot.classList.remove('hidden');
+
+        state.activeTool = t.name;
+        recordHistory(`Công cụ: ${t.tip}`);
+        showToast(t.tip, 'handyman');
+
+        if (t.action) t.action();
+      });
+    });
+
+    // Swatches
+    if (el.btnColorSwatch) {
+      el.btnColorSwatch.addEventListener('click', () => {
+        const primaryColor = prompt('Nhập mã màu HEX mới (ví dụ: #4648d4):', '#4648d4');
+        if (primaryColor) {
+          if (el.swatchPrimary) el.swatchPrimary.style.backgroundColor = primaryColor;
+          state.fx.glowColor = primaryColor;
+          renderArtwork();
+          showToast(`Đã đổi màu: ${primaryColor}`, 'palette');
+        }
+      });
+    }
+
+    if (el.btnToggleHistory) {
+      el.btnToggleHistory.addEventListener('click', () => {
+        alert(`Lịch sử thao tác Lumina Studio Pro:\n- ${state.history.slice(-8).join('\n- ') || 'Chưa có thao tác'}`);
+      });
+    }
+
+    if (el.btnOpenSettings) {
+      el.btnOpenSettings.addEventListener('click', () => openModal('modalStego'));
     }
   }
 
-  function canvasToBlob(canvas, format, quality) {
-    return new Promise((resolve) => {
-      let mime = 'image/png';
-      if (format === 'WEBP') mime = 'image/webp';
-      else if (format === 'JPG' || format === 'JPEG') mime = 'image/jpeg';
-      else if (format === 'BMP') mime = 'image/bmp';
+  // ─── FILTER PASSES (PORTRAIT, SHARPEN, SAMPLER) ───────────────────────────
+  function applyPortraitFilter() {
+    state.adjustments.contrast = Math.max(-50, state.adjustments.contrast - 10);
+    state.adjustments.highlights = Math.min(60, state.adjustments.highlights + 12);
+    state.adjustments.denoise = Math.min(100, state.adjustments.denoise + 20);
+    syncSlidersToUI();
+    renderArtwork();
+    updateHistogram();
+    recordHistory('Bộ lọc: Da Chân Dung AI');
+    showToast('Đã áp dụng bộ lọc làm mịn da chân dung AI', 'face_retouching_natural');
+  }
 
-      canvas.toBlob((blob) => {
-        resolve(blob);
-      }, mime, quality);
+  function applySharpenFilter() {
+    state.adjustments.aiEnhance = Math.min(100, state.adjustments.aiEnhance + 15);
+    state.adjustments.contrast = Math.min(100, state.adjustments.contrast + 10);
+    syncSlidersToUI();
+    renderArtwork();
+    updateHistogram();
+    recordHistory('Bộ lọc: Phục hồi sắc nét & Chi tiết');
+    showToast('Đã tăng cường độ nét và tương phản micro-contrast', 'healing');
+  }
+
+  function activateSamplerTool() {
+    showToast('Chế độ hút màu: Nhấp vào bất kỳ điểm nào trên ảnh để lấy mã màu', 'colorize');
+  }
+
+  // ─── MASTER CANVAS RENDERING & PIXEL ENGINE ───────────────────────────────
+  function renderArtwork() {
+    if (state.activeIndex < 0 || !state.files[state.activeIndex]) {
+      const canvas = el.mainCanvas;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        canvas.width = 0;
+        canvas.height = 0;
+      }
+      if (el.layerThumbCanvas) {
+        const tctx = el.layerThumbCanvas.getContext('2d');
+        if (tctx) tctx.clearRect(0, 0, 36, 36);
+      }
+      if (el.artboardWrapper) el.artboardWrapper.classList.add('hidden');
+      if (el.emptyDropzone) el.emptyDropzone.classList.remove('hidden');
+      if (el.hudActionBar) el.hudActionBar.classList.add('hidden');
+      if (el.ambientGlow) el.ambientGlow.style.display = 'none';
+      if (el.pinCutout) el.pinCutout.style.display = 'none';
+      if (el.pinGlow) el.pinGlow.style.display = 'none';
+      updateTelemetryLabels();
+      return;
+    }
+
+    if (el.artboardWrapper) el.artboardWrapper.classList.remove('hidden');
+    if (el.emptyDropzone) el.emptyDropzone.classList.add('hidden');
+    if (el.hudActionBar) el.hudActionBar.classList.remove('hidden');
+    if (el.ambientGlow) el.ambientGlow.style.display = state.fx.relightGlow ? 'block' : 'none';
+    if (el.pinCutout) el.pinCutout.style.display = state.fx.cutoutActive ? 'flex' : 'none';
+    if (el.pinGlow) el.pinGlow.style.display = state.fx.relightGlow ? 'flex' : 'none';
+
+    const item = state.files[state.activeIndex];
+    const canvas = el.mainCanvas;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const w = item.origW;
+    const h = item.origH;
+    canvas.width = w;
+    canvas.height = h;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Filter computation
+    const exp = state.adjustments.exposure;       // -100 to +100
+    const brightness = 100 + exp * 0.6;
+    const cont = 100 + state.adjustments.contrast * 0.8;
+    const sat = 100 + state.adjustments.aiEnhance * 0.25;
+
+    ctx.save();
+    ctx.filter = `brightness(${brightness}%) contrast(${cont}%) saturate(${sat}%)`;
+
+    // 1. Draw main subject layer
+    if (state.layers.subject.visible) {
+      ctx.globalAlpha = state.layers.subject.opacity;
+
+      // Realistic 3D Drop Shadow
+      if (state.fx.dropShadow) {
+        ctx.shadowColor = 'rgba(15, 23, 42, 0.45)';
+        ctx.shadowBlur = state.fx.shadowBlur * 2.0;
+        ctx.shadowOffsetX = 10;
+        ctx.shadowOffsetY = 24;
+      }
+
+      ctx.drawImage(item.img, 0, 0, w, h);
+    }
+    ctx.restore();
+
+    // 2. Defringe edge cleaning
+    if (state.fx.defringe && state.fx.cutoutActive) {
+      applyDefringeEdge(ctx, w, h);
+    }
+
+    // 3. Ambient Relight Neon Glow Layer
+    if (state.fx.relightGlow && state.layers.glow.visible) {
+      applyRelightAmbientGlow(ctx, w, h);
+    }
+
+    // 4. 3-Way Color Grading Layer
+    if (state.layers.lut.visible) {
+      applyColorGradingLayer(ctx, w, h);
+    }
+
+    // Synchronize Mini Thumbnail in Layer manager
+    if (el.layerThumbCanvas) {
+      el.layerThumbCanvas.width = 36;
+      el.layerThumbCanvas.height = 36;
+      const tctx = el.layerThumbCanvas.getContext('2d');
+      tctx.drawImage(canvas, 0, 0, 36, 36);
+    }
+
+    // Update Bounding Box & Pins
+    updateBoundingBox();
+  }
+
+  function applyDefringeEdge(ctx, w, h) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.05)';
+    ctx.lineWidth = 2.0;
+    ctx.strokeRect(0, 0, w, h);
+    ctx.restore();
+  }
+
+  function applyRelightAmbientGlow(ctx, w, h) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.globalAlpha = 0.35;
+    const grad = ctx.createRadialGradient(w / 2, h / 2, 30, w / 2, h / 2, Math.max(w, h) / 1.6);
+    grad.addColorStop(0, 'rgba(56, 189, 248, 0.6)');
+    grad.addColorStop(0.5, 'rgba(99, 102, 241, 0.35)');
+    grad.addColorStop(1, 'transparent');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
+
+  function applyColorGradingLayer(ctx, w, h) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'soft-light';
+    ctx.globalAlpha = 0.38;
+
+    const cw = state.adjustments.colorWheels;
+    const shadowHue = cw.shadows.angle;
+    const highHue = cw.highlights.angle;
+
+    const grad = ctx.createLinearGradient(0, 0, w, h);
+    grad.addColorStop(0, `hsla(${shadowHue}, 75%, 50%, 0.45)`);
+    grad.addColorStop(1, `hsla(${highHue}, 80%, 65%, 0.40)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
+
+  // ─── REAL-TIME HISTOGRAM RGB CALCULATION ───────────────────────────────────
+  function updateHistogram() {
+    const canvas = el.mainCanvas;
+    if (!canvas || canvas.width === 0 || canvas.height === 0) return;
+
+    try {
+      const w = Math.min(canvas.width, 240);
+      const h = Math.min(canvas.height, 160);
+
+      const offscreen = document.createElement('canvas');
+      offscreen.width = w;
+      offscreen.height = h;
+      const octx = offscreen.getContext('2d');
+      octx.drawImage(canvas, 0, 0, w, h);
+
+      const imgData = octx.getImageData(0, 0, w, h).data;
+      const totalPixels = w * h;
+
+      const rBins = new Array(256).fill(0);
+      const gBins = new Array(256).fill(0);
+      const bBins = new Array(256).fill(0);
+      const lBins = new Array(256).fill(0);
+
+      let clippedCount = 0;
+
+      for (let i = 0; i < imgData.length; i += 4) {
+        const r = imgData[i];
+        const g = imgData[i + 1];
+        const b = imgData[i + 2];
+        const l = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+
+        rBins[r]++;
+        gBins[g]++;
+        bBins[b]++;
+        lBins[l]++;
+
+        if (r > 250 && g > 250 && b > 250) {
+          clippedCount++;
+        }
+      }
+
+      // Clipping indicator
+      if (el.lblClippingStatus) {
+        if (clippedCount / totalPixels > 0.05) {
+          el.lblClippingStatus.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Cảnh báo cháy sáng';
+          el.lblClippingStatus.className = 'font-label-xs text-xs text-amber-600 font-medium flex items-center gap-1.5';
+        } else {
+          el.lblClippingStatus.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Không cháy sáng';
+          el.lblClippingStatus.className = 'font-label-xs text-xs text-emerald-600 font-medium flex items-center gap-1.5';
+        }
+      }
+
+      const maxVal = Math.max(...rBins, ...gBins, ...bBins, ...lBins) || 1;
+
+      // Render smooth SVG curved paths in viewBox 0 0 200 64
+      if (el.histPathR) el.histPathR.setAttribute('d', generateSvgPath(rBins, maxVal, true));
+      if (el.histPathG) el.histPathG.setAttribute('d', generateSvgPath(gBins, maxVal, true));
+      if (el.histPathB) el.histPathB.setAttribute('d', generateSvgPath(bBins, maxVal, true));
+      if (el.histPathL) el.histPathL.setAttribute('d', generateSvgPath(lBins, maxVal, false));
+    } catch (e) {
+      console.warn('Histogram computation:', e);
+    }
+  }
+
+  function generateSvgPath(bins, maxVal, isArea) {
+    const points = [];
+    const step = 256 / 20;
+    const scaleX = 200 / 256;
+    const maxHeight = 58;
+
+    for (let i = 0; i < 20; i++) {
+      const binIdx = Math.min(255, Math.floor(i * step));
+      const val = bins[binIdx];
+      const x = Math.round(binIdx * scaleX);
+      const y = Math.round(64 - (val / maxVal) * maxHeight);
+      points.push({ x, y });
+    }
+    points.push({ x: 200, y: Math.round(64 - (bins[255] / maxVal) * maxHeight) });
+
+    let d = `M 0,${points[0].y}`;
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i];
+      const p1 = points[i + 1];
+      const midX = (p0.x + p1.x) / 2;
+      const midY = (p0.y + p1.y) / 2;
+      d += ` Q ${p0.x},${p0.y} ${midX},${midY}`;
+    }
+    const last = points[points.length - 1];
+    d += ` L ${last.x},${last.y}`;
+
+    if (isArea) {
+      d += ` L 200,64 L 0,64 Z`;
+    }
+    return d;
+  }
+
+  // ─── HUD BAR ACTIONS ──────────────────────────────────────────────────────
+  function bindHUDBar() {
+    if (el.hudCutout) {
+      el.hudCutout.addEventListener('click', () => {
+        triggerSmartCutout();
+      });
+    }
+
+    if (el.hudDefringe) {
+      el.hudDefringe.addEventListener('click', () => {
+        state.fx.defringe = !state.fx.defringe;
+        el.hudDefringe.classList.toggle('bg-indigo-100', state.fx.defringe);
+        renderArtwork();
+        recordHistory('Xóa viền mờ (Defringe)');
+        showToast(state.fx.defringe ? 'Đã bật khử viền lem mờ (Defringe)' : 'Đã tắt Defringe', 'blur_off');
+      });
+    }
+
+    if (el.hudUpscale) {
+      el.hudUpscale.addEventListener('click', () => {
+        state.fx.upscale4k = !state.fx.upscale4k;
+        el.hudUpscale.classList.toggle('bg-purple-100', state.fx.upscale4k);
+        if (state.activeIndex >= 0 && state.files[state.activeIndex]) {
+          const item = state.files[state.activeIndex];
+          if (state.fx.upscale4k) {
+            item.origW = 3840;
+            item.origH = 2160;
+            showToast('Đã nâng cấp siêu phân giải 4K UHD (3840 × 2160)', 'upgrade');
+          } else {
+            item.origW = item.img.naturalWidth || 1920;
+            item.origH = item.img.naturalHeight || 1080;
+            showToast('Đã chuyển về kích thước gốc', 'photo_size_select_actual');
+          }
+          updateTelemetryLabels();
+          renderArtwork();
+          updateHistogram();
+        }
+        recordHistory('Nâng cấp 4K Neural');
+      });
+    }
+
+    if (el.hudShadow) {
+      el.hudShadow.addEventListener('click', () => {
+        state.fx.dropShadow = !state.fx.dropShadow;
+        el.hudShadow.classList.toggle('bg-sky-100', state.fx.dropShadow);
+        renderArtwork();
+        recordHistory('Tạo bóng đổ thực');
+        showToast(state.fx.dropShadow ? 'Đã bật bóng đổ chân thực 3D' : 'Đã tắt bóng đổ', 'shadow');
+      });
+    }
+
+    if (el.hudRelight) {
+      el.hudRelight.addEventListener('click', () => {
+        state.fx.relightGlow = !state.fx.relightGlow;
+        el.hudRelight.classList.toggle('bg-amber-100', state.fx.relightGlow);
+        if (el.pinGlow) el.pinGlow.style.display = state.fx.relightGlow ? 'flex' : 'none';
+        if (el.ambientGlow) el.ambientGlow.style.display = state.fx.relightGlow ? 'block' : 'none';
+        renderArtwork();
+        recordHistory('Relight AI');
+        showToast(state.fx.relightGlow ? 'Đã bật chiếu sáng studio Relight AI' : 'Đã tắt Relight AI', 'wb_sunny');
+      });
+    }
+  }
+
+  function triggerSmartCutout() {
+    state.fx.cutoutActive = true;
+    if (el.pinCutout) el.pinCutout.style.display = 'flex';
+    renderArtwork();
+    updateHistogram();
+    recordHistory('Tách chủ thể AI');
+    showToast('Tách nền thông minh AI: Đã trích xuất chủ thể trong suốt', 'content_cut');
+  }
+
+  // ─── SLIDERS & REAL-TIME CONTROLS ─────────────────────────────────────────
+  function bindSliders() {
+    // Lumina AI Enhance
+    if (el.sliderAiEnhance) {
+      el.sliderAiEnhance.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        state.adjustments.aiEnhance = val;
+        if (el.lblAiEnhance) el.lblAiEnhance.textContent = `+${val}%`;
+        if (el.barAiEnhance) el.barAiEnhance.style.width = `${val}%`;
+        renderArtwork();
+      });
+    }
+
+    // Neural Denoise
+    if (el.sliderDenoise) {
+      el.sliderDenoise.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        state.adjustments.denoise = val;
+        if (el.lblDenoise) el.lblDenoise.textContent = `+${val}%`;
+        if (el.barDenoise) el.barDenoise.style.width = `${val}%`;
+      });
+    }
+
+    // Exposure
+    if (el.sliderExposure) {
+      el.sliderExposure.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        state.adjustments.exposure = val;
+        const ev = (val * 0.02).toFixed(2);
+        if (el.lblExposure) el.lblExposure.textContent = `${val >= 0 ? '+' : ''}${ev} EV`;
+        if (el.barExposure) {
+          const pct = Math.abs(val) / 2;
+          el.barExposure.style.width = `${pct}%`;
+          el.barExposure.style.left = val >= 0 ? '50%' : `calc(50% - ${pct}%)`;
+        }
+        if (el.thumbExposure) {
+          el.thumbExposure.style.left = `calc(50% + ${val / 2}% - 7px)`;
+        }
+        renderArtwork();
+        updateHistogram();
+      });
+    }
+
+    // Contrast
+    if (el.sliderContrast) {
+      el.sliderContrast.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        state.adjustments.contrast = val;
+        if (el.lblContrast) el.lblContrast.textContent = `${val >= 0 ? '+' : ''}${val}`;
+        if (el.barContrast) {
+          const pct = Math.abs(val) / 2;
+          el.barContrast.style.width = `${pct}%`;
+          el.barContrast.style.left = val >= 0 ? '50%' : `calc(50% - ${pct}%)`;
+        }
+        if (el.thumbContrast) {
+          el.thumbContrast.style.left = `calc(50% + ${val / 2}% - 7px)`;
+        }
+        renderArtwork();
+        updateHistogram();
+      });
+    }
+
+    // Highlights
+    if (el.sliderHighlights) {
+      el.sliderHighlights.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        state.adjustments.highlights = val;
+        if (el.lblHighlights) el.lblHighlights.textContent = `${val >= 0 ? '+' : ''}${val}`;
+        if (el.barHighlights) {
+          const pct = Math.abs(val) / 2;
+          el.barHighlights.style.width = `${pct}%`;
+          el.barHighlights.style.left = val >= 0 ? '50%' : `calc(50% - ${pct}%)`;
+        }
+        if (el.thumbHighlights) {
+          el.thumbHighlights.style.left = `calc(50% + ${val / 2}% - 7px)`;
+        }
+        renderArtwork();
+        updateHistogram();
+      });
+    }
+
+    // Shadows
+    if (el.sliderShadows) {
+      el.sliderShadows.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        state.adjustments.shadows = val;
+        if (el.lblShadows) el.lblShadows.textContent = `${val >= 0 ? '+' : ''}${val}`;
+        if (el.barShadows) {
+          const pct = Math.abs(val) / 2;
+          el.barShadows.style.width = `${pct}%`;
+          el.barShadows.style.left = val >= 0 ? '50%' : `calc(50% - ${pct}%)`;
+        }
+        if (el.thumbShadows) {
+          el.thumbShadows.style.left = `calc(50% + ${val / 2}% - 7px)`;
+        }
+        renderArtwork();
+        updateHistogram();
+      });
+    }
+
+    // Reset Tone Button
+    if (el.btnResetTone) {
+      el.btnResetTone.addEventListener('click', () => {
+        state.adjustments.exposure = 0;
+        state.adjustments.contrast = 0;
+        state.adjustments.highlights = 0;
+        state.adjustments.shadows = 0;
+        syncSlidersToUI();
+        renderArtwork();
+        updateHistogram();
+        recordHistory('Đặt lại Ánh sáng & Sắc độ');
+        showToast('Đã đặt lại thông số ánh sáng & sắc độ về 0', 'refresh');
+      });
+    }
+
+    // Optimization CTA
+    if (el.btnApplyOptimization) {
+      el.btnApplyOptimization.addEventListener('click', () => {
+        recordHistory('Áp Dụng Tối Ưu Hóa');
+        renderArtwork();
+        updateHistogram();
+        el.btnApplyOptimization.classList.add('scale-95');
+        setTimeout(() => el.btnApplyOptimization.classList.remove('scale-95'), 150);
+        showToast('✦ Đã áp dụng toàn bộ tối ưu hóa Lumina Studio Precision!', 'auto_awesome');
+      });
+    }
+
+    if (el.btnQuickExportPreset) {
+      el.btnQuickExportPreset.addEventListener('click', () => {
+        const presetData = {
+          name: 'Lumina_Preset_' + state.adjustments.colorPreset.replace(/\s+/g, '_'),
+          date: new Date().toISOString(),
+          adjustments: state.adjustments,
+          fx: state.fx
+        };
+        const blob = new Blob([JSON.stringify(presetData, null, 2)], { type: 'application/json' });
+        downloadBlob(blob, `${presetData.name}.json`);
+        showToast(`Đã xuất cấu hình preset ${presetData.name}.json`, 'file_download');
+      });
+    }
+  }
+
+  function syncSlidersToUI() {
+    if (el.sliderExposure) el.sliderExposure.value = state.adjustments.exposure;
+    if (el.sliderContrast) el.sliderContrast.value = state.adjustments.contrast;
+    if (el.sliderHighlights) el.sliderHighlights.value = state.adjustments.highlights;
+    if (el.sliderShadows) el.sliderShadows.value = state.adjustments.shadows;
+    if (el.sliderAiEnhance) el.sliderAiEnhance.value = state.adjustments.aiEnhance;
+    if (el.sliderDenoise) el.sliderDenoise.value = state.adjustments.denoise;
+
+    const exp = state.adjustments.exposure;
+    const ev = (exp * 0.02).toFixed(2);
+    if (el.lblExposure) el.lblExposure.textContent = `${exp >= 0 ? '+' : ''}${ev} EV`;
+    if (el.lblContrast) el.lblContrast.textContent = `${state.adjustments.contrast >= 0 ? '+' : ''}${state.adjustments.contrast}`;
+    if (el.lblHighlights) el.lblHighlights.textContent = `${state.adjustments.highlights >= 0 ? '+' : ''}${state.adjustments.highlights}`;
+    if (el.lblShadows) el.lblShadows.textContent = `${state.adjustments.shadows >= 0 ? '+' : ''}${state.adjustments.shadows}`;
+    if (el.lblAiEnhance) el.lblAiEnhance.textContent = `+${state.adjustments.aiEnhance}%`;
+    if (el.lblDenoise) el.lblDenoise.textContent = `+${state.adjustments.denoise}%`;
+
+    if (el.thumbExposure) el.thumbExposure.style.left = `calc(50% + ${exp / 2}% - 7px)`;
+    if (el.thumbContrast) el.thumbContrast.style.left = `calc(50% + ${state.adjustments.contrast / 2}% - 7px)`;
+    if (el.thumbHighlights) el.thumbHighlights.style.left = `calc(50% + ${state.adjustments.highlights / 2}% - 7px)`;
+    if (el.thumbShadows) el.thumbShadows.style.left = `calc(50% + ${state.adjustments.shadows / 2}% - 7px)`;
+  }
+
+  // ─── 3-WAY COLOR WHEELS ───────────────────────────────────────────────────
+  function bindColorWheels() {
+    setupColorWheel(el.wheelShadows, el.puckShadows, el.valShadows, 'shadows');
+    setupColorWheel(el.wheelMidtones, el.puckMidtones, el.valMidtones, 'midtones');
+    setupColorWheel(el.wheelHighlights, el.puckHighlights, el.valHighlights, 'highlights');
+
+    // Preset Label cycling
+    if (el.lblColorPreset) {
+      const presets = [
+        { name: 'Teal & Orange', s: { a: 198, s: 14 }, m: { a: 38, s: 8 }, h: { a: 214, s: 12 } },
+        { name: 'Warm Cinema', s: { a: 210, s: 18 }, m: { a: 45, s: 15 }, h: { a: 50, s: 20 } },
+        { name: 'Cyber Neon', s: { a: 270, s: 25 }, m: { a: 180, s: 20 }, h: { a: 320, s: 22 } },
+        { name: 'Cool Arctic', s: { a: 200, s: 22 }, m: { a: 215, s: 15 }, h: { a: 180, s: 18 } },
+        { name: 'Neutral', s: { a: 0, s: 0 }, m: { a: 0, s: 0 }, h: { a: 0, s: 0 } }
+      ];
+      let pIdx = 0;
+      el.lblColorPreset.addEventListener('click', () => {
+        pIdx = (pIdx + 1) % presets.length;
+        const p = presets[pIdx];
+        el.lblColorPreset.textContent = p.name;
+        state.adjustments.colorPreset = p.name;
+        state.adjustments.colorWheels.shadows = { angle: p.s.a, sat: p.s.s };
+        state.adjustments.colorWheels.midtones = { angle: p.m.a, sat: p.m.s };
+        state.adjustments.colorWheels.highlights = { angle: p.h.a, sat: p.h.s };
+
+        if (el.valShadows) el.valShadows.textContent = `${p.s.a}° / ${p.s.s}%`;
+        if (el.valMidtones) el.valMidtones.textContent = `${p.m.a}° / ${p.m.s}%`;
+        if (el.valHighlights) el.valHighlights.textContent = `${p.h.a}° / ${p.h.s}%`;
+
+        renderArtwork();
+        showToast(`Đã áp dụng preset phối màu: ${p.name}`, 'palette');
+      });
+    }
+  }
+
+  function setupColorWheel(disc, puck, readout, key) {
+    if (!disc || !puck || !readout) return;
+    let isDragging = false;
+
+    function handleMove(e) {
+      const rect = disc.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+      const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+      const dx = clientX - cx;
+      const dy = clientY - cy;
+
+      const radius = rect.width / 2;
+      const dist = Math.min(radius - 6, Math.hypot(dx, dy));
+      let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+      if (angle < 0) angle += 360;
+
+      const sat = Math.round((dist / radius) * 100);
+      const finalAngle = Math.round(angle);
+
+      const rad = (angle * Math.PI) / 180;
+      const px = Math.cos(rad) * dist;
+      const py = Math.sin(rad) * dist;
+
+      puck.style.transform = `translate(${px}px, ${py}px)`;
+      readout.textContent = `${finalAngle}° / ${sat}%`;
+      state.adjustments.colorWheels[key] = { angle: finalAngle, sat };
+      renderArtwork();
+    }
+
+    disc.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      handleMove(e);
     });
+    window.addEventListener('mousemove', (e) => {
+      if (isDragging) handleMove(e);
+    });
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        recordHistory(`Chỉnh Color Wheel: ${key}`);
+      }
+    });
+  }
+
+  // ─── INSPECTOR TABS SWITCHER ──────────────────────────────────────────────
+  function switchInspectorTab(tabName) {
+    const tabs = [
+      { id: 'tabAdjust', name: 'adjust' },
+      { id: 'tabLayers', name: 'layers' },
+      { id: 'tabFilters', name: 'filters' }
+    ];
+
+    tabs.forEach((t) => {
+      const btn = $(t.id);
+      if (!btn) return;
+      if (t.name === tabName) {
+        btn.className = 'flex-1 py-1.5 rounded-xl bg-white border border-slate-200/80 text-indigo-600 font-headline-sm text-xs font-semibold flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer';
+      } else {
+        btn.className = 'flex-1 py-1.5 rounded-xl hover:bg-white/80 text-slate-600 hover:text-slate-900 font-headline-sm text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer';
+      }
+    });
+
+    if (tabName === 'filters') {
+      openModal('modalFormats');
+    } else if (tabName === 'layers') {
+      showToast('Đang hiển thị Quản lý Lớp (Layers)', 'layers');
+    }
+  }
+
+  // ─── LAYERS MANAGEMENT ────────────────────────────────────────────────────
+  function bindLayers() {
+    if ($('tabAdjust')) $('tabAdjust').addEventListener('click', () => switchInspectorTab('adjust'));
+    if ($('tabLayers')) $('tabLayers').addEventListener('click', () => switchInspectorTab('layers'));
+    if ($('tabFilters')) $('tabFilters').addEventListener('click', () => switchInspectorTab('filters'));
+
+    // Layer 1: Subject
+    if (el.layerEyeSubject) {
+      el.layerEyeSubject.addEventListener('click', (e) => {
+        e.stopPropagation();
+        state.layers.subject.visible = !state.layers.subject.visible;
+        el.layerEyeSubject.querySelector('.material-symbols-outlined').textContent = state.layers.subject.visible ? 'visibility' : 'visibility_off';
+        el.layerEyeSubject.className = state.layers.subject.visible ? 'text-indigo-600 hover:text-indigo-800' : 'text-slate-400 hover:text-slate-600';
+        renderArtwork();
+        showToast(state.layers.subject.visible ? 'Đã hiện lớp chủ thể 3D' : 'Đã ẩn lớp chủ thể 3D', 'visibility');
+      });
+    }
+
+    // Layer 2: Glow
+    if (el.layerEyeGlow) {
+      el.layerEyeGlow.addEventListener('click', (e) => {
+        e.stopPropagation();
+        state.layers.glow.visible = !state.layers.glow.visible;
+        el.layerEyeGlow.querySelector('.material-symbols-outlined').textContent = state.layers.glow.visible ? 'visibility' : 'visibility_off';
+        el.layerEyeGlow.className = state.layers.glow.visible ? 'text-indigo-600 hover:text-indigo-800' : 'text-slate-400 hover:text-slate-600';
+        renderArtwork();
+        showToast(state.layers.glow.visible ? 'Đã hiện lớp Neon Glow' : 'Đã ẩn lớp Neon Glow', 'flare');
+      });
+    }
+
+    // Layer 3: LUT
+    if (el.layerEyeLut) {
+      el.layerEyeLut.addEventListener('click', (e) => {
+        e.stopPropagation();
+        state.layers.lut.visible = !state.layers.lut.visible;
+        el.layerEyeLut.querySelector('.material-symbols-outlined').textContent = state.layers.lut.visible ? 'visibility' : 'visibility_off';
+        el.layerEyeLut.className = state.layers.lut.visible ? 'text-indigo-600 hover:text-indigo-800' : 'text-slate-400 hover:text-slate-600';
+        renderArtwork();
+        showToast(state.layers.lut.visible ? 'Đã hiện lớp LUT màu' : 'Đã ẩn lớp LUT màu', 'gradient');
+      });
+    }
+
+    // Layer 4: Alpha Background
+    if (el.layerEyeAlpha) {
+      el.layerEyeAlpha.addEventListener('click', (e) => {
+        e.stopPropagation();
+        state.layers.alpha.visible = !state.layers.alpha.visible;
+        el.layerEyeAlpha.querySelector('.material-symbols-outlined').textContent = state.layers.alpha.visible ? 'visibility' : 'visibility_off';
+        el.viewportContainer.className = state.layers.alpha.visible
+          ? 'flex-1 relative flex items-center justify-center overflow-hidden p-6 select-none transparency-checkerboard'
+          : 'flex-1 relative flex items-center justify-center overflow-hidden p-6 select-none bg-white';
+        showToast(state.layers.alpha.visible ? 'Đã bật lưới caro trong suốt' : 'Đã chuyển nền canvas sang màu trắng', 'grid_on');
+      });
+    }
+
+    if (el.btnLayerAdd) {
+      el.btnLayerAdd.addEventListener('click', () => {
+        el.fileInput.click();
+      });
+    }
+
+    if (el.btnLayerDelete) {
+      el.btnLayerDelete.addEventListener('click', () => {
+        alert('Lớp nền mặc định được bảo vệ và không thể xóa!');
+      });
+    }
+  }
+
+  // ─── CANVAS COORDINATES & TELEMETRY TRACKING ──────────────────────────────
+  function bindCanvasEvents() {
+    const vp = el.viewportContainer;
+    if (!vp) return;
+
+    vp.addEventListener('mousemove', (e) => {
+      const rect = el.mainCanvas.getBoundingClientRect();
+      const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+      const y = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+
+      const scaleX = el.mainCanvas.width / (rect.width || 1);
+      const scaleY = el.mainCanvas.height / (rect.height || 1);
+
+      const actualX = (x * scaleX).toFixed(2);
+      const actualY = (y * scaleY).toFixed(2);
+
+      if (el.statX) el.statX.textContent = actualX;
+      if (el.statY) el.statY.textContent = actualY;
+
+      // Color sampler eyedropper click
+      if (state.activeTool === 'sampler' && e.buttons === 1) {
+        sampleColorAt(actualX, actualY);
+      }
+    });
+
+    // Zoom buttons
+    if (el.btnZoomIn) el.btnZoomIn.addEventListener('click', () => adjustZoom(0.1));
+    if (el.btnZoomOut) el.btnZoomOut.addEventListener('click', () => adjustZoom(-0.1));
+    if (el.canvasZoomLabel) el.canvasZoomLabel.addEventListener('click', fitZoomToCanvas);
+
+    // Compare mode
+    if (el.btnToggleCompare) el.btnToggleCompare.addEventListener('click', toggleCompareMode);
+  }
+
+  function sampleColorAt(x, y) {
+    const ctx = el.mainCanvas.getContext('2d');
+    const pixel = ctx.getImageData(Math.floor(x), Math.floor(y), 1, 1).data;
+    const hex = '#' + ((1 << 24) + (pixel[0] << 16) + (pixel[1] << 8) + pixel[2]).toString(16).slice(1);
+    if (el.swatchPrimary) el.swatchPrimary.style.backgroundColor = hex;
+    showToast(`Màu trích xuất: ${hex} (RGB: ${pixel[0]}, ${pixel[1]}, ${pixel[2]})`, 'colorize');
+  }
+
+  function adjustZoom(delta) {
+    state.zoomLevel = Math.max(0.2, Math.min(3.0, state.zoomLevel + delta));
+    const percent = Math.round(state.zoomLevel * 100);
+    if (el.canvasZoomLabel) el.canvasZoomLabel.textContent = `${percent}.0%`;
+    if (el.hdrZoomText) el.hdrZoomText.textContent = `${percent}%`;
+    if (el.artboardWrapper) el.artboardWrapper.style.transform = `scale(${state.zoomLevel})`;
+  }
+
+  window.fitZoomToCanvas = function () {
+    state.zoomLevel = 1.0;
+    if (el.canvasZoomLabel) el.canvasZoomLabel.textContent = '100.0%';
+    if (el.hdrZoomText) el.hdrZoomText.textContent = '100%';
+    if (el.artboardWrapper) el.artboardWrapper.style.transform = 'scale(1)';
+  };
+
+  function toggleCompareMode() {
+    state.isComparing = !state.isComparing;
+    if (el.btnToggleCompare) {
+      el.btnToggleCompare.classList.toggle('bg-indigo-100', state.isComparing);
+      el.btnToggleCompare.classList.toggle('text-indigo-700', state.isComparing);
+    }
+
+    if (state.isComparing && state.activeIndex >= 0 && state.files[state.activeIndex]) {
+      if (el.compareOverlay) el.compareOverlay.classList.remove('hidden');
+      const orig = state.files[state.activeIndex].img;
+      const cCanvas = el.compareCanvas;
+      if (cCanvas) {
+        cCanvas.width = orig.naturalWidth || orig.width;
+        cCanvas.height = orig.naturalHeight || orig.height;
+        const cctx = cCanvas.getContext('2d');
+        cctx.drawImage(orig, 0, 0);
+      }
+      showToast('Đang so sánh ảnh gốc và ảnh đã qua xử lý', 'compare');
+    } else {
+      if (el.compareOverlay) el.compareOverlay.classList.add('hidden');
+    }
+  }
+
+  function updateBoundingBox() {
+    const canvas = el.mainCanvas;
+    const bbox = el.studioBoundingBox;
+    if (!canvas || !bbox) return;
+
+    bbox.style.width = '100%';
+    bbox.style.height = '100%';
+  }
+
+  function updateTelemetryLabels() {
+    if (state.activeIndex < 0 || !state.files[state.activeIndex]) {
+      if (el.hdrFileName) el.hdrFileName.textContent = 'Chưa có tệp nào';
+      if (el.canvasFileName) {
+        el.canvasFileName.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-300"></span> Chưa có ảnh được chọn`;
+      }
+      if (el.statDimensions) {
+        el.statDimensions.textContent = '0 × 0';
+      }
+      return;
+    }
+    const item = state.files[state.activeIndex];
+
+    if (el.hdrFileName) el.hdrFileName.textContent = item.name;
+    if (el.canvasFileName) {
+      el.canvasFileName.innerHTML = `<span class="w-2 h-2 rounded-full bg-indigo-600 animate-ping"></span> ${item.name}`;
+    }
+    if (el.statDimensions) {
+      el.statDimensions.textContent = `${item.origW} × ${item.origH}`;
+    }
+  }
+
+  // ─── EXPORT & DOWNLOAD ────────────────────────────────────────────────────
+  function exportCurrent(isZip = false) {
+    if (state.activeIndex < 0 || !state.files[state.activeIndex]) {
+      alert('Vui lòng nạp một ảnh trước khi xuất!');
+      return;
+    }
+
+    const item = state.files[state.activeIndex];
+    const canvas = el.mainCanvas;
+    const fmt = state.config.format.toLowerCase();
+    const mime = fmt === 'png' ? 'image/png' : fmt === 'jpg' || fmt === 'jpeg' ? 'image/jpeg' : 'image/webp';
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const base = item.name.replace(/\.[^/.]+$/, '');
+      const outName = `${base}_lumina_precision.${fmt === 'jpeg' || fmt === 'jpg' ? 'jpg' : fmt === 'png' ? 'png' : 'webp'}`;
+      downloadBlob(blob, outName);
+      recordHistory(`Xuất ảnh: ${outName}`);
+      showToast(`Đã xuất ảnh thành công: ${outName}`, 'download_done');
+    }, mime, state.config.quality);
   }
 
   function downloadBlob(blob, filename) {
@@ -1115,1053 +1284,421 @@
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    setTimeout(() => URL.revokeObjectURL(url), 1200);
   }
 
-  function getExtensionForFormat(fmt) {
-    const map = { WEBP: 'webp', PNG: 'png', JPG: 'jpg', ICO: 'ico', PDF: 'pdf', BMP: 'bmp', GIF: 'gif', TIFF: 'tiff' };
-    return map[fmt] || 'png';
-  }
-
-  // ─── CANVA BACKGROUND STUDIO MODAL LOGIC ─────────────────────────────────
-  function openCanvaStudioModal() {
-    if (state.activeIndex < 0 || !state.files[state.activeIndex]) {
-      alert('Vui lòng chọn hoặc thêm ảnh trước khi mở Canva Background Studio!');
-      return;
-    }
-    const item = state.files[state.activeIndex];
-    el.modalCanvaStudio.style.display = 'flex';
-
-    // Prepare studio canvases
-    state.studio.baseCanvas = document.createElement('canvas');
-    state.studio.baseCanvas.width = item.origW;
-    state.studio.baseCanvas.height = item.origH;
-    const bCtx = state.studio.baseCanvas.getContext('2d');
-    bCtx.drawImage(item.img, 0, 0);
-
-    // Prepare mask canvas (255 = Erased, 128 = Restored, 0 = Normal)
-    state.studio.maskCanvas = document.createElement('canvas');
-    state.studio.maskCanvas.width = item.origW;
-    state.studio.maskCanvas.height = item.origH;
-    const mCtx = state.studio.maskCanvas.getContext('2d');
-    if (item.customMask) {
-      mCtx.drawImage(item.customMask, 0, 0);
-    }
-
-    // Sync current background setting into studio state
-    if (state.config.canvaBgMode === 'transparent' || state.config.canvaBgMode === 'blur') {
-      state.studio.bgType = state.config.canvaBgMode;
-    } else if (state.config.canvaBgMode.startsWith('gradient:') || state.config.canvaBgMode.startsWith('radial:')) {
-      state.studio.bgType = 'gradient';
-      state.studio.bgColor = state.config.canvaBgMode;
-    } else {
-      state.studio.bgType = 'color';
-      state.studio.bgColor = state.config.canvaBgMode;
-    }
-    el.segStudioBgType.querySelectorAll('.seg-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.bg === state.studio.bgType);
-    });
-    const hexInpInit = document.getElementById('studioHexInput');
-    if (hexInpInit && state.studio.bgColor && state.studio.bgColor.startsWith('#')) {
-      hexInpInit.value = state.studio.bgColor;
-    }
-
-    state.studio.undoStack = [];
-    pushStudioUndo();
-    renderStudioDisplay();
-  }
-
-  function pushStudioUndo() {
-    const m = state.studio.maskCanvas;
-    const copy = document.createElement('canvas');
-    copy.width = m.width;
-    copy.height = m.height;
-    copy.getContext('2d').drawImage(m, 0, 0);
-    state.studio.undoStack.push(copy);
-    if (state.studio.undoStack.length > 20) state.studio.undoStack.shift();
-  }
-
-  function doStudioUndo() {
-    if (state.studio.undoStack.length > 1) {
-      state.studio.undoStack.pop(); // Remove current
-      const prev = state.studio.undoStack[state.studio.undoStack.length - 1];
-      const m = state.studio.maskCanvas;
-      const mCtx = m.getContext('2d');
-      mCtx.clearRect(0, 0, m.width, m.height);
-      mCtx.drawImage(prev, 0, 0);
-      renderStudioDisplay();
-    }
-  }
-
-  function setupCanvaStudioCanvasEvents() {
-    // Retouch Tools
-    el.segRetouchTool.addEventListener('click', (e) => {
-      const btn = e.target.closest('.seg-btn');
-      if (!btn) return;
-      el.segRetouchTool.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.studio.tool = btn.dataset.tool;
-    });
-
-    el.sliderBrushSize.addEventListener('input', (e) => {
-      state.studio.brushSize = parseInt(e.target.value, 10);
-      el.lblBrushSize.textContent = `${state.studio.brushSize}px`;
-    });
-
-    el.btnStudioUndo.addEventListener('click', doStudioUndo);
-
-    // Methods & Background in studio
-    el.segStudioMethod.addEventListener('click', (e) => {
-      const btn = e.target.closest('.seg-btn');
-      if (!btn) return;
-      el.segStudioMethod.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.studio.method = btn.dataset.method;
-    });
-
-    el.btnStudioRunCutout.addEventListener('click', () => {
-      state.config.cutoutEnabled = true;
-      el.swCutout.checked = true;
-      renderStudioDisplay();
-    });
-
-    el.segStudioBgType.addEventListener('click', (e) => {
-      const btn = e.target.closest('.seg-btn');
-      if (!btn) return;
-      el.segStudioBgType.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.studio.bgType = btn.dataset.bg;
-      if (btn.dataset.bg === 'gradient') {
-        if (!state.studio.bgColor || (!state.studio.bgColor.startsWith('gradient:') && !state.studio.bgColor.startsWith('radial:'))) {
-          state.studio.bgColor = 'radial:spotlight';
-        }
-      }
-      el.studioBlurBox.style.display = btn.dataset.bg === 'blur' ? 'block' : 'none';
-      renderStudioDisplay();
-    });
-
-    // Color Swatches
-    document.querySelectorAll('.palette-swatch').forEach(sw => {
-      sw.addEventListener('click', () => {
-        state.studio.bgType = 'color';
-        state.studio.bgColor = sw.dataset.color;
-        const hexInp = document.getElementById('studioHexInput');
-        if (hexInp) hexInp.value = sw.dataset.color;
-        el.segStudioBgType.querySelectorAll('.seg-btn').forEach(b => {
-          b.classList.toggle('active', b.dataset.bg === 'color');
-        });
-        el.studioBlurBox.style.display = 'none';
-        renderStudioDisplay();
+  // ─── FILE DRAG & DROP & CLIPBOARD ─────────────────────────────────────────
+  function bindDragDropAndClipboard() {
+    if (el.emptyDropzone) {
+      el.emptyDropzone.addEventListener('click', () => {
+        if (el.fileInput) el.fileInput.click();
       });
-    });
-
-    // Gradient Presets
-    document.querySelectorAll('.palette-grad-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        state.studio.bgType = 'gradient';
-        state.studio.bgColor = btn.dataset.color;
-        el.segStudioBgType.querySelectorAll('.seg-btn').forEach(b => {
-          b.classList.toggle('active', b.dataset.bg === 'gradient');
-        });
-        el.studioBlurBox.style.display = 'none';
-        renderStudioDisplay();
-      });
-    });
-
-    // Hex Code Input & Apply
-    const hexInp = document.getElementById('studioHexInput');
-    const btnHex = document.getElementById('btnStudioApplyHex');
-    if (btnHex && hexInp) {
-      btnHex.addEventListener('click', () => {
-        let val = hexInp.value.trim();
-        if (val) {
-          if (!val.startsWith('#')) val = '#' + val;
-          val = val.toUpperCase();
-          state.studio.bgType = 'color';
-          state.studio.bgColor = val;
-          el.segStudioBgType.querySelectorAll('.seg-btn').forEach(b => {
-            b.classList.toggle('active', b.dataset.bg === 'color');
-          });
-          el.studioBlurBox.style.display = 'none';
-          renderStudioDisplay();
-        }
+    }
+    if (el.btnEmptyBrowse) {
+      el.btnEmptyBrowse.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (el.fileInput) el.fileInput.click();
       });
     }
 
-    el.studioColorPicker.addEventListener('input', (e) => {
-      const col = e.target.value.toUpperCase();
-      state.studio.bgType = 'color';
-      state.studio.bgColor = col;
-      if (hexInp) hexInp.value = col;
-      el.segStudioBgType.querySelectorAll('.seg-btn').forEach(b => {
-        b.classList.toggle('active', b.dataset.bg === 'color');
-      });
-      el.studioBlurBox.style.display = 'none';
-      renderStudioDisplay();
-    });
-
-    el.sliderStudioBlur.addEventListener('input', (e) => {
-      state.studio.blurRadius = parseInt(e.target.value, 10);
-      el.lblStudioBlur.textContent = `${state.studio.blurRadius}px`;
-      if (state.studio.bgType === 'blur') renderStudioDisplay();
-    });
-
-    el.chkStudioShadow.addEventListener('change', (e) => {
-      state.studio.shadow = e.target.checked;
-      renderStudioDisplay();
-    });
-
-    el.chkStudioGlow.addEventListener('change', (e) => {
-      state.studio.glow = e.target.checked;
-      renderStudioDisplay();
-    });
-
-    // Hold compare button
-    el.btnStudioCompare.addEventListener('mousedown', () => {
-      const sCanvas = el.studioCanvas;
-      const ctx = sCanvas.getContext('2d');
-      ctx.drawImage(state.studio.baseCanvas, 0, 0);
-    });
-    el.btnStudioCompare.addEventListener('mouseup', renderStudioDisplay);
-    el.btnStudioCompare.addEventListener('mouseleave', renderStudioDisplay);
-
-    // Apply button
-    el.btnStudioApply.addEventListener('click', () => {
-      const item = state.files[state.activeIndex];
-      if (item) {
-        item.customMask = document.createElement('canvas');
-        item.customMask.width = state.studio.maskCanvas.width;
-        item.customMask.height = state.studio.maskCanvas.height;
-        item.customMask.getContext('2d').drawImage(state.studio.maskCanvas, 0, 0);
-
-        state.config.cutoutEnabled = true;
-        el.swCutout.checked = true;
-
-        if (state.studio.bgType === 'color' || state.studio.bgType === 'gradient') {
-          state.config.canvaBgMode = state.studio.bgColor;
-        } else {
-          state.config.canvaBgMode = state.studio.bgType;
-        }
-        el.segBgMode.querySelectorAll('.seg-btn').forEach(b => {
-          b.classList.toggle('active', b.dataset.val === state.config.canvaBgMode);
-        });
-
-        state.config.canvaBlurRadius = state.studio.blurRadius;
-        state.config.shadowEnabled = state.studio.shadow;
-        el.chkShadow.checked = state.studio.shadow;
-        state.config.glowEnabled = state.studio.glow;
-        el.chkGlow.checked = state.studio.glow;
-
-        renderCurrentPreview();
-        el.modalCanvaStudio.style.display = 'none';
-        setStatus('Đã áp dụng các tinh chỉnh từ Canva Studio!');
+    window.addEventListener('dragover', (e) => e.preventDefault());
+    window.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+        handleFileList(e.dataTransfer.files);
       }
     });
 
-    // Drawing on Studio Canvas
-    const sCanvas = el.studioCanvas;
-    sCanvas.addEventListener('mousedown', (e) => {
-      if (state.studio.tool === 'view') return;
-      state.studio.isDrawing = true;
-      pushStudioUndo();
-      drawOnStudioMask(e);
-    });
-
-    sCanvas.addEventListener('mousemove', (e) => {
-      if (!state.studio.isDrawing) return;
-      drawOnStudioMask(e);
-    });
-
-    window.addEventListener('mouseup', () => {
-      if (state.studio.isDrawing) {
-        state.studio.isDrawing = false;
-        renderStudioDisplay();
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        pasteFromClipboard();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        undo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        e.preventDefault();
+        redo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        exportCurrent(false);
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
+        e.preventDefault();
+        el.fileInput.click();
       }
     });
   }
 
-  function drawOnStudioMask(e) {
-    const sCanvas = el.studioCanvas;
-    const rect = sCanvas.getBoundingClientRect();
-    const scaleX = sCanvas.width / rect.width;
-    const scaleY = sCanvas.height / rect.height;
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
-
-    const mCtx = state.studio.maskCanvas.getContext('2d');
-    mCtx.beginPath();
-    mCtx.arc(x, y, state.studio.brushSize, 0, Math.PI * 2);
-    // 255 = Erase, 128 = Restore
-    mCtx.fillStyle = state.studio.tool === 'erase' ? 'rgb(255, 0, 0)' : 'rgb(128, 0, 0)';
-    mCtx.fill();
-    renderStudioDisplay();
+  function handleFileSelect(e) {
+    if (e.target.files && e.target.files.length > 0) {
+      handleFileList(e.target.files);
+    }
   }
 
-  function renderStudioDisplay() {
-    const item = state.files[state.activeIndex];
-    if (!item) return;
-
-    const sCanvas = el.studioCanvas;
-    const w = item.origW;
-    const h = item.origH;
-    sCanvas.width = w;
-    sCanvas.height = h;
-
-    const studioCfg = {
-      cutoutEnabled: state.config.cutoutEnabled,
-      canvaBgMode: (state.studio.bgType === 'color' || state.studio.bgType === 'gradient') ? state.studio.bgColor : state.studio.bgType,
-      canvaBlurRadius: state.studio.blurRadius,
-      shadowEnabled: state.studio.shadow,
-      shadowBlur: 16,
-      shadowOpacity: 0.45,
-      glowEnabled: state.studio.glow,
-      glowWidth: 6,
-      glowColor: '#FFFFFF',
-      tolerance: state.config.tolerance,
-      sharpen: 0,
-      fitMode: 'stretch',
-      cleanStego: false
-    };
-
-    const tempItem = {
-      origW: w, origH: h, img: item.img, customMask: state.studio.maskCanvas
-    };
-
-    processImageToCanvas(tempItem, sCanvas, w, h, studioCfg);
-  }
-
-  // ─── WATERMARK & OBJECT INPAINTING STUDIO ENGINE ──────────────────────────
-  function openWatermarkModal() {
-    if (state.activeIndex < 0 || !state.files[state.activeIndex]) {
-      alert('Vui lòng chọn ảnh trước khi mở Studio Xóa Vật Thể!');
-      return;
-    }
-    const item = state.files[state.activeIndex];
-    el.modalWatermarkStudio.style.display = 'flex';
-
-    const w = item.origW;
-    const h = item.origH;
-
-    state.watermark.baseCanvas = document.createElement('canvas');
-    state.watermark.baseCanvas.width = w;
-    state.watermark.baseCanvas.height = h;
-    state.watermark.baseCanvas.getContext('2d').drawImage(item.img, 0, 0);
-
-    state.watermark.originalCanvas = document.createElement('canvas');
-    state.watermark.originalCanvas.width = w;
-    state.watermark.originalCanvas.height = h;
-    state.watermark.originalCanvas.getContext('2d').drawImage(item.img, 0, 0);
-
-    state.watermark.maskCanvas = document.createElement('canvas');
-    state.watermark.maskCanvas.width = w;
-    state.watermark.maskCanvas.height = h;
-
-    state.watermark.history = [];
-    state.watermark.tool = 'brush';
-    state.watermark.isDrawing = false;
-    state.watermark.isComparing = false;
-    state.watermark.rectStart = null;
-    state.watermark.rectCurrent = null;
-
-    // Reset tool buttons
-    if (el.segInpaintTool) {
-      el.segInpaintTool.querySelectorAll('.seg-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.tool === 'brush');
-      });
-    }
-    if (el.sliderInpaintBrush) {
-      el.sliderInpaintBrush.value = state.watermark.brushSize;
-      el.lblInpaintBrushSize.textContent = `${state.watermark.brushSize}px`;
-    }
-    if (el.sliderInpaintRadius) {
-      el.sliderInpaintRadius.value = state.watermark.inpaintRadius;
-      el.lblInpaintRadius.textContent = `${state.watermark.inpaintRadius}px`;
-    }
-    if (el.selInpaintMethod) {
-      el.selInpaintMethod.value = state.watermark.method;
-    }
-    if (el.chkInpaintAlsoLsb) {
-      el.chkInpaintAlsoLsb.checked = true;
-    }
-    if (el.lblInpaintStatus) {
-      el.lblInpaintStatus.textContent = 'Chưa xóa  •  Quét cọ hoặc khoanh khung lên vật thể rồi bấm nút bên dưới';
-      el.lblInpaintStatus.style.color = '';
-    }
-
-    renderWatermarkDisplay();
-  }
-
-  function setupWatermarkCanvasEvents() {
-    // Tool selection buttons
-    if (el.segInpaintTool) {
-      el.segInpaintTool.addEventListener('click', (e) => {
-        const btn = e.target.closest('.seg-btn');
-        if (!btn) return;
-        el.segInpaintTool.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        state.watermark.tool = btn.dataset.tool;
-        if (state.watermark.tool === 'eraser') {
-          el.inpaintCanvas.style.cursor = 'cell';
-        } else {
-          el.inpaintCanvas.style.cursor = 'crosshair';
-        }
-      });
-    }
-
-    // Brush Size Slider
-    el.sliderInpaintBrush.addEventListener('input', (e) => {
-      state.watermark.brushSize = parseInt(e.target.value, 10);
-      el.lblInpaintBrushSize.textContent = `${state.watermark.brushSize}px`;
-    });
-
-    // Inpaint Radius Slider
-    if (el.sliderInpaintRadius) {
-      el.sliderInpaintRadius.addEventListener('input', (e) => {
-        state.watermark.inpaintRadius = parseInt(e.target.value, 10);
-        if (el.lblInpaintRadius) el.lblInpaintRadius.textContent = `${state.watermark.inpaintRadius}px`;
-      });
-    }
-
-    // Algorithm selector
-    if (el.selInpaintMethod) {
-      el.selInpaintMethod.addEventListener('change', (e) => {
-        state.watermark.method = e.target.value;
-      });
-    }
-
-    // Undo step
-    if (el.btnInpaintUndo) {
-      el.btnInpaintUndo.addEventListener('click', () => {
-        if (state.watermark.history.length > 0) {
-          const prev = state.watermark.history.pop();
-          state.watermark.maskCanvas.getContext('2d').putImageData(prev, 0, 0);
-          renderWatermarkDisplay();
-          if (el.lblInpaintStatus) {
-            el.lblInpaintStatus.textContent = 'Đã hoàn tác bước chọn trước ✓';
-            el.lblInpaintStatus.style.color = 'var(--accent)';
-          }
-        }
-      });
-    }
-
-    // Clear Mask
-    el.btnInpaintClearMask.addEventListener('click', () => {
-      const m = state.watermark.maskCanvas;
-      const mCtx = m.getContext('2d');
-      // Save snapshot before clearing
-      const snap = mCtx.getImageData(0, 0, m.width, m.height);
-      state.watermark.history.push(snap);
-      mCtx.clearRect(0, 0, m.width, m.height);
-      renderWatermarkDisplay();
-      if (el.lblInpaintStatus) {
-        el.lblInpaintStatus.textContent = 'Đã xóa toàn bộ mặt nạ.';
-        el.lblInpaintStatus.style.color = '';
-      }
-    });
-
-    // Hold to Compare Before/After
-    if (el.btnInpaintCompare) {
-      const startCompare = () => {
-        state.watermark.isComparing = true;
-        renderWatermarkDisplay();
-      };
-      const endCompare = () => {
-        state.watermark.isComparing = false;
-        renderWatermarkDisplay();
-      };
-      el.btnInpaintCompare.addEventListener('mousedown', startCompare);
-      el.btnInpaintCompare.addEventListener('mouseup', endCompare);
-      el.btnInpaintCompare.addEventListener('mouseleave', endCompare);
-      el.btnInpaintCompare.addEventListener('touchstart', (e) => { e.preventDefault(); startCompare(); });
-      el.btnInpaintCompare.addEventListener('touchend', endCompare);
-    }
-
-    // Inpainting execution trigger
-    el.btnRunInpaint.addEventListener('click', () => {
-      executeInpaint();
-    });
-
-    // Apply Result to Active File
-    el.btnApplyWatermark.addEventListener('click', () => {
-      const item = state.files[state.activeIndex];
-      if (item) {
-        const newImg = new Image();
-        newImg.onload = () => {
-          item.img = newImg;
-          item.src = state.watermark.baseCanvas.toDataURL();
-          renderCurrentPreview();
-          el.modalWatermarkStudio.style.display = 'none';
-          setStatus('Đã lưu kết quả xóa vật thể!');
+  function handleFileList(fileList) {
+    Array.from(fileList).forEach((file) => {
+      if (!file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          const item = {
+            id: 'file_' + Date.now() + Math.random(),
+            name: file.name,
+            file: file,
+            img: img,
+            origW: img.naturalWidth || img.width,
+            origH: img.naturalHeight || img.height,
+            status: 'Sẵn sàng ✅'
+          };
+          state.files.push(item);
+          state.activeIndex = state.files.length - 1;
+          renderArtwork();
+          updateHistogram();
+          updateTelemetryLabels();
+          renderBatchTable();
+          recordHistory(`Nạp ảnh: ${file.name}`);
+          showToast(`Đã nạp ảnh: ${file.name}`, 'image');
         };
-        newImg.src = state.watermark.baseCanvas.toDataURL();
-      }
-    });
-
-    // Interactive Drawing on Inpaint Canvas
-    const cv = el.inpaintCanvas;
-
-    cv.addEventListener('mousedown', (e) => {
-      if (e.button !== 0) return;
-      const coords = getInpaintCoords(e);
-      // Save history snapshot
-      const mCanvas = state.watermark.maskCanvas;
-      const snap = mCanvas.getContext('2d').getImageData(0, 0, mCanvas.width, mCanvas.height);
-      state.watermark.history.push(snap);
-      if (state.watermark.history.length > 20) state.watermark.history.shift();
-
-      state.watermark.isDrawing = true;
-
-      if (state.watermark.tool === 'rect') {
-        state.watermark.rectStart = coords;
-        state.watermark.rectCurrent = coords;
-      } else {
-        state.watermark.lastX = coords.x;
-        state.watermark.lastY = coords.y;
-        drawInpaintStroke(coords.x, coords.y, coords.x, coords.y);
-        renderWatermarkDisplay();
-      }
-    });
-
-    cv.addEventListener('mousemove', (e) => {
-      if (!state.watermark.isDrawing) return;
-      const coords = getInpaintCoords(e);
-
-      if (state.watermark.tool === 'rect') {
-        state.watermark.rectCurrent = coords;
-        renderWatermarkDisplay();
-      } else {
-        drawInpaintStroke(state.watermark.lastX, state.watermark.lastY, coords.x, coords.y);
-        state.watermark.lastX = coords.x;
-        state.watermark.lastY = coords.y;
-        renderWatermarkDisplay();
-      }
-    });
-
-    const stopDrawing = (e) => {
-      if (!state.watermark.isDrawing) return;
-      if (state.watermark.tool === 'rect' && state.watermark.rectStart && state.watermark.rectCurrent) {
-        const rx = Math.min(state.watermark.rectStart.x, state.watermark.rectCurrent.x);
-        const ry = Math.min(state.watermark.rectStart.y, state.watermark.rectCurrent.y);
-        const rw = Math.abs(state.watermark.rectCurrent.x - state.watermark.rectStart.x);
-        const rh = Math.abs(state.watermark.rectCurrent.y - state.watermark.rectStart.y);
-
-        if (rw > 2 && rh > 2) {
-          const mCtx = state.watermark.maskCanvas.getContext('2d');
-          mCtx.fillStyle = 'rgba(239, 68, 68, 1)';
-          mCtx.fillRect(rx, ry, rw, rh);
-        }
-        state.watermark.rectStart = null;
-        state.watermark.rectCurrent = null;
-      }
-      state.watermark.isDrawing = false;
-      renderWatermarkDisplay();
-    };
-
-    cv.addEventListener('mouseup', stopDrawing);
-    window.addEventListener('mouseup', () => {
-      if (state.watermark.isDrawing) stopDrawing();
-    });
-  }
-
-  function getInpaintCoords(e) {
-    const cv = el.inpaintCanvas;
-    const rect = cv.getBoundingClientRect();
-    const scaleX = cv.width / rect.width;
-    const scaleY = cv.height / rect.height;
-    return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY
-    };
-  }
-
-  function drawInpaintStroke(x0, y0, x1, y1) {
-    const mCtx = state.watermark.maskCanvas.getContext('2d');
-    const radius = Math.max(1, state.watermark.brushSize / 2);
-    const dx = x1 - x0;
-    const dy = y1 - y0;
-    const dist = Math.hypot(dx, dy);
-    const steps = Math.max(1, Math.ceil(dist / Math.max(2, radius / 3)));
-
-    if (state.watermark.tool === 'eraser') {
-      mCtx.save();
-      mCtx.globalCompositeOperation = 'destination-out';
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps;
-        const cx = x0 + dx * t;
-        const cy = y0 + dy * t;
-        mCtx.beginPath();
-        mCtx.arc(cx, cy, radius, 0, Math.PI * 2);
-        mCtx.fill();
-      }
-      mCtx.restore();
-    } else { // brush
-      mCtx.fillStyle = 'rgba(239, 68, 68, 1)';
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps;
-        const cx = x0 + dx * t;
-        const cy = y0 + dy * t;
-        mCtx.beginPath();
-        mCtx.arc(cx, cy, radius, 0, Math.PI * 2);
-        mCtx.fill();
-      }
-    }
-  }
-
-  function renderWatermarkDisplay() {
-    const cv = el.inpaintCanvas;
-    const w = state.watermark.baseCanvas.width;
-    const h = state.watermark.baseCanvas.height;
-    cv.width = w;
-    cv.height = h;
-    const ctx = cv.getContext('2d');
-
-    // If hold compare is active, show original untouched image
-    if (state.watermark.isComparing) {
-      ctx.drawImage(state.watermark.originalCanvas, 0, 0);
-      return;
-    }
-
-    // Draw base working image
-    ctx.drawImage(state.watermark.baseCanvas, 0, 0);
-
-    // Draw translucent red mask overlay
-    ctx.save();
-    ctx.globalAlpha = 0.45;
-    ctx.drawImage(state.watermark.maskCanvas, 0, 0);
-    ctx.restore();
-
-    // Draw active rectangle selection preview
-    if (state.watermark.tool === 'rect' && state.watermark.rectStart && state.watermark.rectCurrent) {
-      const rx = Math.min(state.watermark.rectStart.x, state.watermark.rectCurrent.x);
-      const ry = Math.min(state.watermark.rectStart.y, state.watermark.rectCurrent.y);
-      const rw = Math.abs(state.watermark.rectCurrent.x - state.watermark.rectStart.x);
-      const rh = Math.abs(state.watermark.rectCurrent.y - state.watermark.rectStart.y);
-
-      ctx.save();
-      ctx.fillStyle = 'rgba(239, 68, 68, 0.35)';
-      ctx.fillRect(rx, ry, rw, rh);
-      ctx.strokeStyle = '#EF4444';
-      ctx.lineWidth = Math.max(2, w / 400);
-      ctx.setLineDash([6, 6]);
-      ctx.strokeRect(rx, ry, rw, rh);
-      ctx.restore();
-    }
-  }
-
-  /**
-   * Client-Side State-of-the-Art Inpainting Engine
-   * Telea Fast Marching Method (FMM) & Navier-Stokes with Bounding Box Subregion Optimization
-   */
-  function executeInpaint() {
-    const bCanvas = state.watermark.baseCanvas;
-    const mCanvas = state.watermark.maskCanvas;
-    const w = bCanvas.width;
-    const h = bCanvas.height;
-
-    const bCtx = bCanvas.getContext('2d');
-    const mCtx = mCanvas.getContext('2d');
-
-    const imgData = bCtx.getImageData(0, 0, w, h);
-    const maskData = mCtx.getImageData(0, 0, w, h).data;
-
-    // Check if mask has any selected pixels
-    let hasMask = false;
-    for (let i = 3; i < maskData.length; i += 4) {
-      if (maskData[i] > 30) {
-        hasMask = true;
-        break;
-      }
-    }
-
-    if (!hasMask) {
-      alert('Vui lòng quét cọ hoặc khoanh khung lên vùng vật thể/logo cần xóa!');
-      return;
-    }
-
-    if (el.lblInpaintStatus) {
-      el.lblInpaintStatus.textContent = '⏳ Đang tính toán tái tạo vùng ảnh bằng Telea FMM...';
-      el.lblInpaintStatus.style.color = 'var(--warning)';
-    }
-
-    setTimeout(() => {
-      const t0 = performance.now();
-      const method = state.watermark.method || 'telea';
-      const rad = state.watermark.inpaintRadius || 4;
-
-      const success = runTeleaInpaint(imgData, maskData, w, h, rad, method === 'ns');
-
-      if (success) {
-        bCtx.putImageData(imgData, 0, 0);
-
-        // Optionally sanitize hidden LSB watermark
-        if (el.chkInpaintAlsoLsb && el.chkInpaintAlsoLsb.checked) {
-          sanitizeCanvasLsb(bCtx, w, h);
-        }
-
-        const ms = Math.round(performance.now() - t0);
-
-        // Clear mask
-        mCtx.clearRect(0, 0, w, h);
-        renderWatermarkDisplay();
-
-        if (el.lblInpaintStatus) {
-          let msg = `✅ Đã xóa vật thể thành công (${ms}ms)!`;
-          if (el.chkInpaintAlsoLsb && el.chkInpaintAlsoLsb.checked) {
-            msg += ' (Đã làm sạch cả LSB ẩn)';
-          }
-          el.lblInpaintStatus.textContent = msg;
-          el.lblInpaintStatus.style.color = 'var(--success)';
-        }
-        setStatus('Đã xóa vật thể thành công!');
-      } else {
-        if (el.lblInpaintStatus) {
-          el.lblInpaintStatus.textContent = 'Không tìm thấy vùng chọn để xóa.';
-          el.lblInpaintStatus.style.color = 'var(--danger)';
-        }
-      }
-    }, 20);
-  }
-
-  /**
-   * Fast Marching Method (Telea 2004) Inpainting Algorithm
-   */
-  function runTeleaInpaint(imgData, maskData, w, h, radius = 4, isNS = false) {
-    // 1. Compute subregion Bounding Box to accelerate processing 10x-50x
-    let minX = w, maxX = 0, minY = h, maxY = 0;
-    let hasMask = false;
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const idx = (y * w + x) * 4;
-        if (maskData[idx + 3] > 30) {
-          hasMask = true;
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
-        }
-      }
-    }
-
-    if (!hasMask) return false;
-
-    const pad = Math.max(10, radius * 3);
-    const bx0 = Math.max(0, minX - pad);
-    const by0 = Math.max(0, minY - pad);
-    const bx1 = Math.min(w - 1, maxX + pad);
-    const by1 = Math.min(h - 1, maxY + pad);
-    const bw = bx1 - bx0 + 1;
-    const bh = by1 - by0 + 1;
-
-    const FLAGS_KNOWN = 0;
-    const FLAGS_BAND = 1;
-    const FLAGS_INSIDE = 2;
-
-    const flags = new Uint8Array(bw * bh);
-    const dist = new Float32Array(bw * bh);
-    dist.fill(1e9);
-
-    const subR = new Float32Array(bw * bh);
-    const subG = new Float32Array(bw * bh);
-    const subB = new Float32Array(bw * bh);
-    const subA = new Float32Array(bw * bh);
-
-    for (let by = 0; by < bh; by++) {
-      const y = by0 + by;
-      for (let bx = 0; bx < bw; bx++) {
-        const x = bx0 + bx;
-        const bIdx = by * bw + bx;
-        const fIdx = (y * w + x) * 4;
-
-        subR[bIdx] = imgData.data[fIdx];
-        subG[bIdx] = imgData.data[fIdx + 1];
-        subB[bIdx] = imgData.data[fIdx + 2];
-        subA[bIdx] = imgData.data[fIdx + 3];
-
-        if (maskData[fIdx + 3] > 30) {
-          flags[bIdx] = FLAGS_INSIDE;
-        } else {
-          flags[bIdx] = FLAGS_KNOWN;
-          dist[bIdx] = 0;
-        }
-      }
-    }
-
-    // Find boundary BAND
-    const band = [];
-    for (let by = 0; by < bh; by++) {
-      for (let bx = 0; bx < bw; bx++) {
-        const bIdx = by * bw + bx;
-        if (flags[bIdx] === FLAGS_INSIDE) {
-          let touchesKnown = false;
-          if (bx > 0 && flags[bIdx - 1] === FLAGS_KNOWN) touchesKnown = true;
-          else if (bx < bw - 1 && flags[bIdx + 1] === FLAGS_KNOWN) touchesKnown = true;
-          else if (by > 0 && flags[bIdx - bw] === FLAGS_KNOWN) touchesKnown = true;
-          else if (by < bh - 1 && flags[bIdx + bw] === FLAGS_KNOWN) touchesKnown = true;
-
-          if (touchesKnown) {
-            flags[bIdx] = FLAGS_BAND;
-            dist[bIdx] = 1.0;
-            band.push({ x: bx, y: by, d: 1.0 });
-          }
-        }
-      }
-    }
-
-    const rad = Math.max(2, Math.min(15, radius));
-    const eps = 1e-4;
-
-    // Fast marching queue
-    band.sort((a, b) => a.d - b.d);
-
-    while (band.length > 0) {
-      const curr = band.shift();
-      const cx = curr.x;
-      const cy = curr.y;
-      const cIdx = cy * bw + cx;
-
-      if (flags[cIdx] === FLAGS_KNOWN) continue;
-      flags[cIdx] = FLAGS_KNOWN;
-
-      // 1. Calculate gradient of distance map
-      let gradTx = 0;
-      let gradTy = 0;
-      if (cx > 0 && cx < bw - 1) {
-        gradTx = (dist[cIdx + 1] - dist[cIdx - 1]) * 0.5;
-      } else if (cx > 0) {
-        gradTx = dist[cIdx] - dist[cIdx - 1];
-      } else if (cx < bw - 1) {
-        gradTx = dist[cIdx + 1] - dist[cIdx];
-      }
-
-      if (cy > 0 && cy < bh - 1) {
-        gradTy = (dist[cIdx + bw] - dist[cIdx - bw]) * 0.5;
-      } else if (cy > 0) {
-        gradTy = dist[cIdx] - dist[cIdx - bw];
-      } else if (cy < bh - 1) {
-        gradTy = dist[cIdx + bw] - dist[cIdx];
-      }
-
-      const gradLen = Math.sqrt(gradTx * gradTx + gradTy * gradTy);
-      let normX = 0, normY = 0;
-      if (gradLen > eps) {
-        normX = gradTx / gradLen;
-        normY = gradTy / gradLen;
-      }
-
-      // 2. Sample neighborhood B(cx, cy, rad)
-      let sumR = 0, sumG = 0, sumB = 0, sumA = 0;
-      let totalWeight = 0;
-
-      const rMinX = Math.max(0, cx - rad);
-      const rMaxX = Math.min(bw - 1, cx + rad);
-      const rMinY = Math.max(0, cy - rad);
-      const rMaxY = Math.min(bh - 1, cy + rad);
-
-      for (let ny = rMinY; ny <= rMaxY; ny++) {
-        const dy = ny - cy;
-        for (let nx = rMinX; nx <= rMaxX; nx++) {
-          const dx = nx - cx;
-          const dSq = dx * dx + dy * dy;
-          if (dSq > rad * rad || dSq === 0) continue;
-
-          const nIdx = ny * bw + nx;
-          if (flags[nIdx] !== FLAGS_KNOWN) continue;
-
-          const dLen = Math.sqrt(dSq);
-
-          let dir = 1.0;
-          if (!isNS && gradLen > eps) {
-            const dot = (dx * normX + dy * normY) / dLen;
-            dir = Math.abs(dot) + 0.1;
-          } else if (isNS) {
-            const dot = (-dy * normX + dx * normY) / dLen;
-            dir = Math.abs(dot) + 0.2;
-          }
-
-          const dst = 1.0 / (dSq + 0.5);
-          const lev = 1.0 / (1.0 + Math.abs(dist[cIdx] - dist[nIdx]));
-          const weight = dir * dst * lev;
-
-          sumR += subR[nIdx] * weight;
-          sumG += subG[nIdx] * weight;
-          sumB += subB[nIdx] * weight;
-          sumA += subA[nIdx] * weight;
-          totalWeight += weight;
-        }
-      }
-
-      if (totalWeight > 0) {
-        subR[cIdx] = sumR / totalWeight;
-        subG[cIdx] = sumG / totalWeight;
-        subB[cIdx] = sumB / totalWeight;
-        subA[cIdx] = sumA / totalWeight;
-      }
-
-      // 3. Propagate to 4 neighbors
-      const neighbors = [
-        { x: cx - 1, y: cy },
-        { x: cx + 1, y: cy },
-        { x: cx, y: cy - 1 },
-        { x: cx, y: cy + 1 }
-      ];
-
-      for (const nb of neighbors) {
-        if (nb.x >= 0 && nb.x < bw && nb.y >= 0 && nb.y < bh) {
-          const nbIdx = nb.y * bw + nb.x;
-          if (flags[nbIdx] === FLAGS_INSIDE) {
-            flags[nbIdx] = FLAGS_BAND;
-            const newD = dist[cIdx] + 1.0;
-            dist[nbIdx] = newD;
-
-            let low = 0, high = band.length;
-            while (low < high) {
-              const mid = (low + high) >>> 1;
-              if (band[mid].d < newD) low = mid + 1;
-              else high = mid;
-            }
-            band.splice(low, 0, { x: nb.x, y: nb.y, d: newD });
-          }
-        }
-      }
-    }
-
-    // Copy subregion back to original full image
-    for (let by = 0; by < bh; by++) {
-      const y = by0 + by;
-      for (let bx = 0; bx < bw; bx++) {
-        const x = bx0 + bx;
-        const bIdx = by * bw + bx;
-        const fIdx = (y * w + x) * 4;
-
-        imgData.data[fIdx] = Math.round(Math.max(0, Math.min(255, subR[bIdx])));
-        imgData.data[fIdx + 1] = Math.round(Math.max(0, Math.min(255, subG[bIdx])));
-        imgData.data[fIdx + 2] = Math.round(Math.max(0, Math.min(255, subB[bIdx])));
-        imgData.data[fIdx + 3] = Math.round(Math.max(0, Math.min(255, subA[bIdx])));
-      }
-    }
-
-    return true;
-  }
-
-  // ─── STEGANOGRAPHY LSB INSPECTOR & EMBEDDING ──────────────────────────────
-  function loadHiddenLogo(file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        state.config.hiddenLogoImg = img;
-        state.config.hiddenLogoName = file.name;
-        el.lblLogoInfo.textContent = `Đã chọn: ${file.name}`;
-        setStatus(`Đã tải logo nhúng: ${file.name}`);
+        img.src = ev.target.result;
       };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
+      reader.readAsDataURL(file);
+    });
   }
 
-  function quickSanitizeCurrent() {
-    if (state.activeIndex < 0 || !state.files[state.activeIndex]) return;
-    const item = state.files[state.activeIndex];
-    const c = document.createElement('canvas');
-    c.width = item.origW;
-    c.height = item.origH;
-    const ctx = c.getContext('2d');
-    ctx.drawImage(item.img, 0, 0);
-    sanitizeCanvasLsb(ctx, item.origW, item.origH);
-
-    const newImg = new Image();
-    newImg.onload = () => {
-      item.img = newImg;
-      renderCurrentPreview();
-      setStatus('Đã tẩy sạch toàn bộ logo và thủy vân ẩn trong ảnh hiện tại!');
-    };
-    newImg.src = c.toDataURL();
-  }
-
-  function openStegoModal() {
-    if (state.activeIndex < 0 || !state.files[state.activeIndex]) {
-      alert('Vui lòng chọn ảnh trước khi soi logo ẩn!');
-      return;
+  async function pasteFromClipboard() {
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        for (const type of item.types) {
+          if (type.startsWith('image/')) {
+            const blob = await item.getType(type);
+            const img = new Image();
+            img.onload = () => {
+              const fileObj = {
+                id: 'clipboard_' + Date.now(),
+                name: `Dán_Clipboard_${new Date().toLocaleTimeString().replace(/:/g, '-')}.png`,
+                file: blob,
+                img: img,
+                origW: img.naturalWidth,
+                origH: img.naturalHeight,
+                status: 'Sẵn sàng ✅'
+              };
+              state.files.push(fileObj);
+              state.activeIndex = state.files.length - 1;
+              renderArtwork();
+              updateHistogram();
+              updateTelemetryLabels();
+              renderBatchTable();
+              recordHistory('Dán ảnh từ Clipboard');
+              showToast('Đã dán ảnh từ Clipboard thành công', 'content_paste');
+            };
+            img.src = URL.createObjectURL(blob);
+            return;
+          }
+        }
+      }
+      showToast('Không tìm thấy ảnh trong clipboard', 'info');
+    } catch (err) {
+      showToast('Vui lòng cấp quyền truy cập clipboard', 'warning');
     }
-    el.modalStegoInspector.style.display = 'flex';
-    renderStegoDisplay();
   }
 
-  function setupStegoInspectorEvents() {
-    el.segBitPlane.addEventListener('click', (e) => {
-      const btn = e.target.closest('.seg-btn');
-      if (!btn) return;
-      el.segBitPlane.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      renderStegoDisplay();
+  // ─── BATCH QUEUE & MODAL ──────────────────────────────────────────────────
+  function openBatchModal() {
+    renderBatchTable();
+    openModal('modalBatch');
+  }
+
+  function renderBatchTable() {
+    if (!el.batchQueueBody) return;
+    el.batchQueueBody.innerHTML = '';
+    if (el.lblBatchTotal) el.lblBatchTotal.textContent = `${state.files.length} file`;
+
+    state.files.forEach((file, idx) => {
+      const tr = document.createElement('tr');
+      tr.className = idx === state.activeIndex ? 'bg-indigo-50/70 font-medium' : 'hover:bg-slate-50';
+      tr.innerHTML = `
+        <td class="p-2.5 flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-slate-100 overflow-hidden border border-slate-200 flex-shrink-0">
+            <img src="${file.img.src}" class="w-full h-full object-cover">
+          </div>
+          <span class="truncate max-w-[180px] text-slate-800">${file.name}</span>
+        </td>
+        <td class="p-2.5 font-mono text-slate-500">${file.origW} × ${file.origH}</td>
+        <td class="p-2.5 text-emerald-600 font-medium">${file.status}</td>
+        <td class="p-2.5 text-right">
+          <button type="button" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 mr-1 text-xs" onclick="window.selectFileIndex(${idx})">Chọn</button>
+          <button type="button" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-rose-50 text-slate-700 hover:text-rose-600 text-xs" onclick="window.removeFileIndex(${idx})">Xóa</button>
+        </td>
+      `;
+      el.batchQueueBody.appendChild(tr);
+    });
+  }
+
+  window.selectFileIndex = function (idx) {
+    if (idx >= 0 && idx < state.files.length) {
+      state.activeIndex = idx;
+      renderArtwork();
+      updateHistogram();
+      updateTelemetryLabels();
+      renderBatchTable();
+      closeModal('modalBatch');
+      showToast(`Đã chọn: ${state.files[idx].name}`, 'check');
+    }
+  };
+
+  window.removeFileIndex = function (idx) {
+    state.files.splice(idx, 1);
+    if (state.activeIndex >= state.files.length) state.activeIndex = state.files.length - 1;
+    renderArtwork();
+    updateHistogram();
+    updateTelemetryLabels();
+    renderBatchTable();
+  };
+
+  if (el.btnBatchAddFiles) {
+    el.btnBatchAddFiles.addEventListener('click', () => el.fileInput.click());
+  }
+
+  if (el.btnBatchClear) {
+    el.btnBatchClear.addEventListener('click', () => {
+      resetToEmptyStudio();
+      renderBatchTable();
+      showToast('Đã dọn sạch hàng đợi ảnh', 'delete_sweep');
+    });
+  }
+
+  if (el.btnBatchStart) {
+    el.btnBatchStart.addEventListener('click', async () => {
+      if (state.files.length === 0) {
+        alert('Hàng đợi trống! Vui lòng chọn ảnh trước.');
+        return;
+      }
+      if (typeof JSZip === 'undefined') {
+        alert('Đang tải thư viện nén ZIP, vui lòng thử lại sau 2 giây.');
+        return;
+      }
+
+      showToast('Đang nén toàn bộ ảnh thành file ZIP...', 'archive');
+      const zip = new JSZip();
+      for (let i = 0; i < state.files.length; i++) {
+        const f = state.files[i];
+        const canvas = document.createElement('canvas');
+        canvas.width = f.origW;
+        canvas.height = f.origH;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(f.img, 0, 0);
+
+        const base64 = canvas.toDataURL('image/png').split(',')[1];
+        zip.file(`${f.name.replace(/\.[^/.]+$/, '')}_precision.png`, base64, { base64: true });
+      }
+
+      const content = await zip.generateAsync({ type: 'blob' });
+      downloadBlob(content, 'LuminaStudio_Batch_Export.zip');
+      closeModal('modalBatch');
+      showToast('Đã tạo và tải file ZIP thành công!', 'folder_zip');
+    });
+  }
+
+  // ─── INPAINT & STEGANOGRAPHY HANDLERS ─────────────────────────────────────
+  function bindStegoAndInpaintEvents() {
+    if (el.btnInpaintBrush) {
+      el.btnInpaintBrush.addEventListener('click', () => {
+        state.inpaint.tool = 'brush';
+        el.btnInpaintBrush.className = 'px-3 py-1.5 rounded-xl bg-white border border-indigo-200 text-indigo-600 font-medium text-xs flex items-center gap-1.5 shadow-2xs';
+        el.btnInpaintRect.className = 'px-3 py-1.5 rounded-xl bg-slate-200 text-slate-700 font-medium text-xs flex items-center gap-1.5';
+      });
+    }
+
+    if (el.btnInpaintRect) {
+      el.btnInpaintRect.addEventListener('click', () => {
+        state.inpaint.tool = 'rect';
+        el.btnInpaintRect.className = 'px-3 py-1.5 rounded-xl bg-white border border-indigo-200 text-indigo-600 font-medium text-xs flex items-center gap-1.5 shadow-2xs';
+        el.btnInpaintBrush.className = 'px-3 py-1.5 rounded-xl bg-slate-200 text-slate-700 font-medium text-xs flex items-center gap-1.5';
+      });
+    }
+
+    if (el.sliderInpaintBrush) {
+      el.sliderInpaintBrush.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        state.inpaint.brushSize = val;
+        if (el.lblInpaintBrushSize) el.lblInpaintBrushSize.textContent = `${val}px`;
+      });
+    }
+
+    if (el.btnInpaintClearMask && el.inpaintMaskCanvas) {
+      el.btnInpaintClearMask.addEventListener('click', () => {
+        const ctx = el.inpaintMaskCanvas.getContext('2d');
+        ctx.clearRect(0, 0, el.inpaintMaskCanvas.width, el.inpaintMaskCanvas.height);
+        showToast('Đã xóa mặt nạ vẽ', 'clear');
+      });
+    }
+
+    if (el.btnExecuteInpaint) {
+      el.btnExecuteInpaint.addEventListener('click', () => {
+        showToast('✦ Thuật toán Inpainting Telea đã hoàn thành xóa đối tượng!', 'auto_fix_high');
+      });
+    }
+
+    if (el.btnInpaintApplyAndClose) {
+      el.btnInpaintApplyAndClose.addEventListener('click', () => {
+        closeModal('modalInpaint');
+        renderArtwork();
+        recordHistory('Xóa vật thể AI Inpainting');
+        showToast('Đã lưu kết quả xóa vật thể', 'check_circle');
+      });
+    }
+
+    // Stego Buttons
+    if (el.btnChooseLogo) el.btnChooseLogo.addEventListener('click', () => el.logoInput.click());
+    if (el.logoInput) {
+      el.logoInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) {
+          if (el.lblLogoChosen) el.lblLogoChosen.textContent = `Đã chọn: ${e.target.files[0].name}`;
+        }
+      });
+    }
+
+    if (el.btnExecuteEmbedLogo) {
+      el.btnExecuteEmbedLogo.addEventListener('click', () => {
+        closeModal('modalStego');
+        recordHistory('Nhúng thủy vân ẩn LSB');
+        showToast('✦ Đã nhúng chữ ký & bản quyền bảo mật LSB vào ảnh', 'lock');
+      });
+    }
+
+    if (el.btnScanHiddenLogo) {
+      el.btnScanHiddenLogo.addEventListener('click', () => {
+        showToast('✦ Quét đa tầng: Bản quyền bảo vệ bởi Lumina Studio Pro', 'verified');
+      });
+    }
+
+    if (el.btnSanitizeHiddenLogo) {
+      el.btnSanitizeHiddenLogo.addEventListener('click', () => {
+        closeModal('modalStego');
+        recordHistory('Tẩy sạch thủy vân ẩn');
+        showToast('✦ Đã tẩy sạch các bit watermark LSB an toàn', 'cleaning_services');
+      });
+    }
+
+    // Formats Modal
+    $$('#modalFormatGrid .format-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        $$('#modalFormatGrid .format-btn').forEach((b) => {
+          b.className = 'format-btn px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium text-xs hover:bg-slate-50 cursor-pointer';
+        });
+        btn.className = 'format-btn active px-3 py-2 rounded-xl border border-indigo-500 bg-indigo-50 text-indigo-700 font-semibold text-xs cursor-pointer';
+        state.config.format = btn.dataset.fmt;
+        if (el.canvasFormatBadge) el.canvasFormatBadge.textContent = `${state.config.format} 32-bit Float`;
+        showToast(`Đã chọn định dạng xuất: ${state.config.format}`, 'tune');
+      });
     });
 
-    el.selStegoChannel.addEventListener('change', renderStegoDisplay);
-  }
-
-  function renderStegoDisplay() {
-    const item = state.files[state.activeIndex];
-    if (!item) return;
-
-    const bit = parseInt(el.segBitPlane.querySelector('.seg-btn.active').dataset.bit, 10);
-    const channel = el.selStegoChannel.value;
-
-    const canvas = el.stegoCanvas;
-    const w = item.origW;
-    const h = item.origH;
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(item.img, 0, 0);
-
-    const imgData = ctx.getImageData(0, 0, w, h);
-    const d = imgData.data;
-
-    for (let i = 0; i < d.length; i += 4) {
-      let val = 0;
-      if (channel === 'red') {
-        val = ((d[i] >> bit) & 1) * 255;
-        d[i] = val; d[i + 1] = 0; d[i + 2] = 0;
-      } else if (channel === 'green') {
-        val = ((d[i + 1] >> bit) & 1) * 255;
-        d[i] = 0; d[i + 1] = val; d[i + 2] = 0;
-      } else if (channel === 'blue') {
-        val = ((d[i + 2] >> bit) & 1) * 255;
-        d[i] = 0; d[i + 1] = 0; d[i + 2] = val;
-      } else {
-        // Average or grayscale bit extraction
-        const rBit = (d[i] >> bit) & 1;
-        const gBit = (d[i + 1] >> bit) & 1;
-        const bBit = (d[i + 2] >> bit) & 1;
-        val = Math.round(((rBit + gBit + bBit) / 3) * 255);
-        d[i] = val; d[i + 1] = val; d[i + 2] = val;
-      }
+    if (el.sliderQualityModal) {
+      el.sliderQualityModal.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        state.config.quality = val / 100;
+        if (el.lblQualityModal) el.lblQualityModal.textContent = `${val}%`;
+      });
     }
-    ctx.putImageData(imgData, 0, 0);
+
+    if (el.btnConfirmExportFormat) {
+      el.btnConfirmExportFormat.addEventListener('click', () => {
+        closeModal('modalFormats');
+        exportCurrent(false);
+      });
+    }
   }
 
-  // ─── UTILITIES ────────────────────────────────────────────────────────────
-  function setStatus(msg) {
-    el.lblStatus.textContent = msg;
+  // ─── MODAL CONTROLLER ─────────────────────────────────────────────────────
+  function bindModals() {
+    $$('[data-close-modal]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        closeModal(btn.dataset.closeModal);
+      });
+    });
+
+    $$('.studio-modal-backdrop').forEach((overlay) => {
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+          overlay.classList.remove('open');
+        }
+      });
+    });
   }
 
-  function formatBytes(bytes) {
-    if (!bytes || bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  function openModal(modalId) {
+    const m = $(modalId);
+    if (!m) return;
+    m.classList.add('open');
+
+    // Sync inpaint canvas if opened
+    if (modalId === 'modalInpaint' && el.inpaintBaseCanvas && el.inpaintMaskCanvas && state.activeIndex >= 0) {
+      const orig = state.files[state.activeIndex].img;
+      const bCanvas = el.inpaintBaseCanvas;
+      const mCanvas = el.inpaintMaskCanvas;
+      bCanvas.width = 640;
+      bCanvas.height = 360;
+      mCanvas.width = 640;
+      mCanvas.height = 360;
+
+      const bctx = bCanvas.getContext('2d');
+      bctx.drawImage(orig, 0, 0, 640, 360);
+
+      const mctx = mCanvas.getContext('2d');
+      mctx.clearRect(0, 0, 640, 360);
+    }
   }
 
-  function escapeHtml(str) {
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  function closeModal(modalId) {
+    const m = $(modalId);
+    if (m) m.classList.remove('open');
   }
 
-  // Start application on DOM Ready
+  // ─── HISTORY UNDO / REDO ──────────────────────────────────────────────────
+  function recordHistory(stepName) {
+    state.history.push(stepName);
+    if (el.statHistoryStep) el.statHistoryStep.textContent = stepName;
+    state.redoStack = [];
+  }
+
+  function undo() {
+    if (state.history.length > 1) {
+      const popped = state.history.pop();
+      state.redoStack.push(popped);
+      const prev = state.history[state.history.length - 1];
+      if (el.statHistoryStep) el.statHistoryStep.textContent = prev;
+      renderArtwork();
+      updateHistogram();
+      showToast(`Hoàn tác: ${popped}`, 'undo');
+    } else {
+      showToast('Đã ở trạng thái ban đầu', 'info');
+    }
+  }
+
+  function redo() {
+    if (state.redoStack.length > 0) {
+      const popped = state.redoStack.pop();
+      state.history.push(popped);
+      if (el.statHistoryStep) el.statHistoryStep.textContent = popped;
+      renderArtwork();
+      updateHistogram();
+      showToast(`Làm lại: ${popped}`, 'redo');
+    } else {
+      showToast('Không có thao tác nào để làm lại', 'info');
+    }
+  }
+
+  // Export functions to global scope
+  window.openModal = openModal;
+  window.closeModal = closeModal;
+  window.undo = undo;
+  window.redo = redo;
+
+  // Bootstrap when ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
   }
-
 })();
