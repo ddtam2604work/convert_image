@@ -63,6 +63,26 @@
       targetH: null
     },
 
+    // Transform (Rotate & Flip Studio)
+    transform: {
+      rotation: 0,
+      flipH: false,
+      flipV: false
+    },
+
+    // Watermark & Branding Stamp
+    watermark: {
+      active: false,
+      text: '© Lumina Studio Pro',
+      pos: 'br',
+      color: 'white',
+      opacity: 0.5,
+      size: 28
+    },
+
+    // Split Screen Compare
+    splitPercent: 50,
+
     // Inpaint Studio
     inpaint: {
       tool: 'brush',
@@ -148,6 +168,26 @@
     hudUpscale: $('hudUpscale'),
     hudShadow: $('hudShadow'),
     hudRelight: $('hudRelight'),
+    hudRotateCw: $('hudRotateCw'),
+    hudFlipH: $('hudFlipH'),
+    hudFlipV: $('hudFlipV'),
+    hudWatermark: $('hudWatermark'),
+
+    // Auto-Balance & Filters
+    btnAutoBalance: $('btnAutoBalance'),
+    activeFilterName: $('activeFilterName'),
+
+    // Watermark Modal
+    modalWatermark: $('modalWatermark'),
+    inputWatermarkText: $('inputWatermarkText'),
+    selWatermarkPos: $('selWatermarkPos'),
+    selWatermarkColor: $('selWatermarkColor'),
+    sliderWatermarkOpacity: $('sliderWatermarkOpacity'),
+    lblWatermarkOpacity: $('lblWatermarkOpacity'),
+    sliderWatermarkSize: $('sliderWatermarkSize'),
+    lblWatermarkSize: $('lblWatermarkSize'),
+    btnApplyWatermark: $('btnApplyWatermark'),
+    btnClearWatermark: $('btnClearWatermark'),
 
     // Status Footer
     statX: $('statX'),
@@ -271,6 +311,9 @@
     bindModals();
     bindDragDropAndClipboard();
     bindStegoAndInpaintEvents();
+    bindTransformAndWatermark();
+    bindPresetsAndAutoBalance();
+    setupCompareDivider();
 
     // Initialize studio in clean ready state awaiting user imports
     renderArtwork();
@@ -537,8 +580,10 @@
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    const w = item.origW;
-    const h = item.origH;
+    const rot = (state.transform.rotation || 0) % 360;
+    const isRot90 = rot === 90 || rot === 270;
+    const w = isRot90 ? item.origH : item.origW;
+    const h = isRot90 ? item.origW : item.origH;
     canvas.width = w;
     canvas.height = h;
 
@@ -553,7 +598,7 @@
     ctx.save();
     ctx.filter = `brightness(${brightness}%) contrast(${cont}%) saturate(${sat}%)`;
 
-    // 1. Draw main subject layer
+    // 1. Draw main subject layer with rotation and flipping
     if (state.layers.subject.visible) {
       ctx.globalAlpha = state.layers.subject.opacity;
 
@@ -565,7 +610,12 @@
         ctx.shadowOffsetY = 24;
       }
 
-      ctx.drawImage(item.img, 0, 0, w, h);
+      ctx.save();
+      ctx.translate(w / 2, h / 2);
+      ctx.rotate((rot * Math.PI) / 180);
+      ctx.scale(state.transform.flipH ? -1 : 1, state.transform.flipV ? -1 : 1);
+      ctx.drawImage(item.img, -item.origW / 2, -item.origH / 2, item.origW, item.origH);
+      ctx.restore();
     }
     ctx.restore();
 
@@ -584,6 +634,16 @@
       applyColorGradingLayer(ctx, w, h);
     }
 
+    // 5. Watermark & Branding Stamp Layer
+    if (state.watermark && state.watermark.active && state.watermark.text) {
+      applyWatermarkLayer(ctx, w, h);
+    }
+
+    // 6. Split Screen Compare update
+    if (state.isComparing) {
+      updateCompareCanvas();
+    }
+
     // Synchronize Mini Thumbnail in Layer manager
     if (el.layerThumbCanvas) {
       el.layerThumbCanvas.width = 36;
@@ -594,6 +654,69 @@
 
     // Update Bounding Box & Pins
     updateBoundingBox();
+  }
+
+  function applyWatermarkLayer(ctx, w, h) {
+    const wm = state.watermark;
+    if (!wm || !wm.active || !wm.text) return;
+
+    ctx.save();
+    const fontSize = Math.max(14, Math.round((wm.size || 28) * (w / 1200)));
+    ctx.font = `bold ${fontSize}px "Hanken Grotesk", sans-serif`;
+
+    let fill = 'rgba(255, 255, 255, ';
+    if (wm.color === 'black') fill = 'rgba(15, 23, 42, ';
+    else if (wm.color === 'primary') fill = 'rgba(99, 102, 241, ';
+    else if (wm.color === 'gold') fill = 'rgba(245, 158, 11, ';
+
+    ctx.fillStyle = fill + (wm.opacity ?? 0.5) + ')';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
+
+    const pad = fontSize * 1.4;
+
+    if (wm.pos === 'tile') {
+      ctx.restore();
+      ctx.save();
+      ctx.font = `600 ${Math.max(12, Math.round(fontSize * 0.75))}px "Hanken Grotesk", sans-serif`;
+      ctx.fillStyle = fill + ((wm.opacity ?? 0.5) * 0.45) + ')';
+      ctx.rotate(-Math.PI / 6);
+      const textW = ctx.measureText(wm.text).width;
+      const stepX = textW + 80;
+      const stepY = fontSize * 3.8;
+      for (let y = -h * 2; y < h * 2; y += stepY) {
+        for (let x = -w * 2; x < w * 2; x += stepX) {
+          ctx.fillText(wm.text, x, y);
+        }
+      }
+      ctx.restore();
+      return;
+    }
+
+    if (wm.pos === 'center') {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(wm.text, w / 2, h / 2);
+    } else if (wm.pos === 'tl') {
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(wm.text, pad, pad);
+    } else if (wm.pos === 'tr') {
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'top';
+      ctx.fillText(wm.text, w - pad, pad);
+    } else if (wm.pos === 'bl') {
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(wm.text, pad, h - pad);
+    } else { // 'br' default
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(wm.text, w - pad, h - pad);
+    }
+    ctx.restore();
   }
 
   function applyDefringeEdge(ctx, w, h) {
@@ -802,6 +925,256 @@
     updateHistogram();
     recordHistory('Tách chủ thể AI');
     showToast('Tách nền thông minh AI: Đã trích xuất chủ thể trong suốt', 'content_cut');
+  }
+
+  // ─── TRANSFORM & WATERMARK CONTROLS ───────────────────────────────────────
+  function bindTransformAndWatermark() {
+    // HUD Rotate CW
+    if (el.hudRotateCw) {
+      el.hudRotateCw.addEventListener('click', () => {
+        state.transform.rotation = (state.transform.rotation + 90) % 360;
+        renderArtwork();
+        updateHistogram();
+        updateTelemetryLabels();
+        recordHistory(`Xoay ảnh ${state.transform.rotation}°`);
+        showToast(`Đã xoay ảnh sang phải (+90°) -> Góc hiện tại: ${state.transform.rotation}°`, 'rotate_right');
+      });
+    }
+
+    // HUD Flip H
+    if (el.hudFlipH) {
+      el.hudFlipH.addEventListener('click', () => {
+        state.transform.flipH = !state.transform.flipH;
+        el.hudFlipH.classList.toggle('bg-indigo-100', state.transform.flipH);
+        renderArtwork();
+        recordHistory('Lật gương ngang');
+        showToast(state.transform.flipH ? 'Đã lật gương chiều ngang (Flip Horizontal)' : 'Hủy lật ngang', 'swap_horiz');
+      });
+    }
+
+    // HUD Flip V
+    if (el.hudFlipV) {
+      el.hudFlipV.addEventListener('click', () => {
+        state.transform.flipV = !state.transform.flipV;
+        el.hudFlipV.classList.toggle('bg-indigo-100', state.transform.flipV);
+        renderArtwork();
+        recordHistory('Lật gương dọc');
+        showToast(state.transform.flipV ? 'Đã lật gương chiều dọc (Flip Vertical)' : 'Hủy lật dọc', 'swap_vert');
+      });
+    }
+
+    // HUD Watermark modal trigger
+    if (el.hudWatermark) {
+      el.hudWatermark.addEventListener('click', () => {
+        openModal('modalWatermark');
+      });
+    }
+
+    // Watermark Modal controls
+    if (el.sliderWatermarkOpacity) {
+      el.sliderWatermarkOpacity.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        state.watermark.opacity = val / 100;
+        if (el.lblWatermarkOpacity) el.lblWatermarkOpacity.textContent = `${val}%`;
+        if (state.watermark.active) renderArtwork();
+      });
+    }
+
+    if (el.sliderWatermarkSize) {
+      el.sliderWatermarkSize.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        state.watermark.size = val;
+        if (el.lblWatermarkSize) el.lblWatermarkSize.textContent = `${val}px`;
+        if (state.watermark.active) renderArtwork();
+      });
+    }
+
+    if (el.btnApplyWatermark) {
+      el.btnApplyWatermark.addEventListener('click', () => {
+        if (el.inputWatermarkText) state.watermark.text = el.inputWatermarkText.value.trim() || '© Lumina Studio Pro';
+        if (el.selWatermarkPos) state.watermark.pos = el.selWatermarkPos.value;
+        if (el.selWatermarkColor) state.watermark.color = el.selWatermarkColor.value;
+        state.watermark.active = true;
+        closeModal('modalWatermark');
+        renderArtwork();
+        recordHistory('Đóng dấu Watermark');
+        showToast('Đã áp dụng con dấu bản quyền Watermark!', 'verified');
+      });
+    }
+
+    if (el.btnClearWatermark) {
+      el.btnClearWatermark.addEventListener('click', () => {
+        state.watermark.active = false;
+        closeModal('modalWatermark');
+        renderArtwork();
+        recordHistory('Xóa Watermark');
+        showToast('Đã gỡ bỏ con dấu bản quyền Watermark', 'delete');
+      });
+    }
+  }
+
+  // ─── 1-CLICK PRESETS & AUTO-BALANCE ──────────────────────────────────────
+  const COLOR_PRESETS = {
+    'teal-orange': {
+      name: 'Teal & Orange',
+      exposure: 12, contrast: 24, highlights: -18, shadows: 28, aiEnhance: 80,
+      cw: { shadows: { angle: 198, sat: 22 }, midtones: { angle: 38, sat: 12 }, highlights: { angle: 214, sat: 18 } }
+    },
+    'cyber-neon': {
+      name: 'Cyber Neon',
+      exposure: 5, contrast: 38, highlights: 15, shadows: -10, aiEnhance: 95,
+      cw: { shadows: { angle: 270, sat: 35 }, midtones: { angle: 180, sat: 25 }, highlights: { angle: 320, sat: 30 } }
+    },
+    'vintage-film': {
+      name: 'Vintage Film',
+      exposure: 15, contrast: -10, highlights: -35, shadows: 45, aiEnhance: 40,
+      cw: { shadows: { angle: 45, sat: 18 }, midtones: { angle: 40, sat: 14 }, highlights: { angle: 55, sat: 16 } }
+    },
+    'monochrome': {
+      name: 'Monochrome Pro',
+      exposure: 8, contrast: 42, highlights: -10, shadows: 20, aiEnhance: 0,
+      cw: { shadows: { angle: 0, sat: 0 }, midtones: { angle: 0, sat: 0 }, highlights: { angle: 0, sat: 0 } }
+    },
+    'golden-sunset': {
+      name: 'Golden Sunset',
+      exposure: 20, contrast: 18, highlights: -15, shadows: 25, aiEnhance: 75,
+      cw: { shadows: { angle: 35, sat: 24 }, midtones: { angle: 42, sat: 20 }, highlights: { angle: 48, sat: 28 } }
+    },
+    'nordic-clean': {
+      name: 'Clean Nordic',
+      exposure: 22, contrast: 10, highlights: -25, shadows: 15, aiEnhance: 65,
+      cw: { shadows: { angle: 210, sat: 12 }, midtones: { angle: 200, sat: 8 }, highlights: { angle: 190, sat: 10 } }
+    }
+  };
+
+  function applyColorPreset(presetKey) {
+    const p = COLOR_PRESETS[presetKey];
+    if (!p) return;
+
+    state.adjustments.colorPreset = p.name;
+    state.adjustments.exposure = p.exposure;
+    state.adjustments.contrast = p.contrast;
+    state.adjustments.highlights = p.highlights;
+    state.adjustments.shadows = p.shadows;
+    state.adjustments.aiEnhance = p.aiEnhance;
+    state.adjustments.colorWheels.shadows = { ...p.cw.shadows };
+    state.adjustments.colorWheels.midtones = { ...p.cw.midtones };
+    state.adjustments.colorWheels.highlights = { ...p.cw.highlights };
+
+    if (el.lblColorPreset) el.lblColorPreset.textContent = p.name;
+    if (el.activeFilterName) el.activeFilterName.textContent = p.name;
+
+    // Highlight active preset card
+    $$('#presetFilterGrid .preset-filter-btn').forEach(btn => {
+      const isCurrent = btn.dataset.preset === presetKey;
+      btn.classList.toggle('border-indigo-600', isCurrent);
+      btn.classList.toggle('ring-2', isCurrent);
+      btn.classList.toggle('ring-indigo-300', isCurrent);
+      btn.classList.toggle('border-slate-200', !isCurrent);
+    });
+
+    syncSlidersToUI();
+    renderArtwork();
+    updateHistogram();
+    recordHistory(`Bộ lọc: ${p.name}`);
+    showToast(`Đã áp dụng bộ lọc nghệ thuật: ${p.name}`, 'palette');
+  }
+
+  function autoBalanceImage() {
+    if (state.activeIndex < 0 || !state.files[state.activeIndex]) {
+      showToast('Vui lòng nạp một ảnh trước khi cân bằng màu!', 'info');
+      return;
+    }
+
+    const canvas = el.mainCanvas;
+    if (!canvas || canvas.width === 0 || canvas.height === 0) return;
+
+    try {
+      const sampleW = Math.min(canvas.width, 160);
+      const sampleH = Math.min(canvas.height, 120);
+      const off = document.createElement('canvas');
+      off.width = sampleW;
+      off.height = sampleH;
+      const offCtx = off.getContext('2d');
+      offCtx.drawImage(canvas, 0, 0, sampleW, sampleH);
+      const imgData = offCtx.getImageData(0, 0, sampleW, sampleH).data;
+
+      let totalLum = 0;
+      let minLum = 255;
+      let maxLum = 0;
+      const pixelCount = sampleW * sampleH;
+
+      for (let i = 0; i < imgData.length; i += 4) {
+        const lum = 0.299 * imgData[i] + 0.587 * imgData[i + 1] + 0.114 * imgData[i + 2];
+        totalLum += lum;
+        if (lum < minLum) minLum = lum;
+        if (lum > maxLum) maxLum = lum;
+      }
+
+      const avgLum = totalLum / (pixelCount || 1);
+
+      let newExposure = 0;
+      if (avgLum < 100) {
+        newExposure = Math.min(45, Math.round((120 - avgLum) * 0.45));
+      } else if (avgLum > 160) {
+        newExposure = Math.max(-35, Math.round((140 - avgLum) * 0.35));
+      } else {
+        newExposure = 8;
+      }
+
+      const dynamicRange = maxLum - minLum;
+      let newContrast = 18;
+      if (dynamicRange < 140) {
+        newContrast = Math.min(40, Math.round((160 - dynamicRange) * 0.4));
+      } else if (dynamicRange > 220) {
+        newContrast = 10;
+      }
+
+      let newHighlights = -18;
+      let newShadows = 24;
+      if (minLum < 20) newShadows = 38;
+      if (maxLum > 240) newHighlights = -30;
+
+      state.adjustments.exposure = newExposure;
+      state.adjustments.contrast = newContrast;
+      state.adjustments.highlights = newHighlights;
+      state.adjustments.shadows = newShadows;
+      state.adjustments.aiEnhance = 85;
+
+      syncSlidersToUI();
+      renderArtwork();
+      updateHistogram();
+      recordHistory('Auto-Balance Cân Bằng Thông Minh');
+      showToast('✦ Đã tối ưu hóa phơi sáng & dải động thông minh!', 'auto_awesome');
+    } catch (e) {
+      console.warn('Auto balance fallback:', e);
+      state.adjustments.exposure = 12;
+      state.adjustments.contrast = 20;
+      state.adjustments.highlights = -15;
+      state.adjustments.shadows = 25;
+      state.adjustments.aiEnhance = 85;
+      syncSlidersToUI();
+      renderArtwork();
+      updateHistogram();
+      showToast('✦ Đã áp dụng cân bằng sáng chuẩn Studio', 'auto_awesome');
+    }
+  }
+
+  function bindPresetsAndAutoBalance() {
+    // Auto Balance CTA
+    if (el.btnAutoBalance) {
+      el.btnAutoBalance.addEventListener('click', () => {
+        autoBalanceImage();
+      });
+    }
+
+    // Preset filter buttons
+    $$('#presetFilterGrid .preset-filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const preset = btn.dataset.preset;
+        if (preset) applyColorPreset(preset);
+      });
+    });
   }
 
   // ─── SLIDERS & REAL-TIME CONTROLS ─────────────────────────────────────────
@@ -1208,19 +1581,73 @@
     }
 
     if (state.isComparing && state.activeIndex >= 0 && state.files[state.activeIndex]) {
-      if (el.compareOverlay) el.compareOverlay.classList.remove('hidden');
-      const orig = state.files[state.activeIndex].img;
-      const cCanvas = el.compareCanvas;
-      if (cCanvas) {
-        cCanvas.width = orig.naturalWidth || orig.width;
-        cCanvas.height = orig.naturalHeight || orig.height;
-        const cctx = cCanvas.getContext('2d');
-        cctx.drawImage(orig, 0, 0);
+      if (el.compareOverlay) {
+        el.compareOverlay.classList.remove('hidden');
+        el.compareOverlay.classList.add('active');
       }
-      showToast('Đang so sánh ảnh gốc và ảnh đã qua xử lý', 'compare');
+      updateCompareCanvas();
+      updateCompareSplit();
+      showToast('Chế độ so sánh Squoosh: Kéo vạch chia để so sánh ảnh gốc và xử lý', 'compare');
     } else {
-      if (el.compareOverlay) el.compareOverlay.classList.add('hidden');
+      if (el.compareOverlay) {
+        el.compareOverlay.classList.add('hidden');
+        el.compareOverlay.classList.remove('active');
+      }
     }
+  }
+
+  function updateCompareCanvas() {
+    if (state.activeIndex < 0 || !state.files[state.activeIndex]) return;
+    const orig = state.files[state.activeIndex].img;
+    const cCanvas = el.compareCanvas;
+    if (!cCanvas) return;
+
+    const w = el.mainCanvas.width;
+    const h = el.mainCanvas.height;
+    cCanvas.width = w;
+    cCanvas.height = h;
+
+    const cctx = cCanvas.getContext('2d');
+    cctx.clearRect(0, 0, w, h);
+
+    const rot = (state.transform.rotation || 0) % 360;
+    cctx.save();
+    cctx.translate(w / 2, h / 2);
+    cctx.rotate((rot * Math.PI) / 180);
+    cctx.scale(state.transform.flipH ? -1 : 1, state.transform.flipV ? -1 : 1);
+    cctx.drawImage(orig, -state.files[state.activeIndex].origW / 2, -state.files[state.activeIndex].origH / 2, state.files[state.activeIndex].origW, state.files[state.activeIndex].origH);
+    cctx.restore();
+  }
+
+  function updateCompareSplit() {
+    const p = Math.max(0, Math.min(100, state.splitPercent));
+    if (el.compareDivider) el.compareDivider.style.left = `${p}%`;
+    if (el.compareCanvas) el.compareCanvas.style.clipPath = `polygon(0 0, ${p}% 0, ${p}% 100%, 0 100%)`;
+  }
+
+  function setupCompareDivider() {
+    if (!el.compareDivider || !el.compareOverlay) return;
+    let isDragging = false;
+
+    el.compareDivider.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      el.compareDivider.setPointerCapture(e.pointerId);
+      e.stopPropagation();
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      if (!isDragging || !el.compareOverlay) return;
+      const rect = el.compareOverlay.getBoundingClientRect();
+      if (rect.width <= 0) return;
+      const rawX = e.clientX - rect.left;
+      const pct = Math.max(3, Math.min(97, (rawX / rect.width) * 100));
+      state.splitPercent = pct;
+      updateCompareSplit();
+    });
+
+    window.addEventListener('pointerup', () => {
+      isDragging = false;
+    });
   }
 
   function updateBoundingBox() {
@@ -1301,6 +1728,16 @@
       });
     }
 
+    // Load sample image buttons
+    $$('.btn-load-sample').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const sampleUrl = btn.dataset.sample;
+        const name = sampleUrl.split('/').pop();
+        loadSampleImage(sampleUrl, name);
+      });
+    });
+
     window.addEventListener('dragover', (e) => e.preventDefault());
     window.addEventListener('drop', (e) => {
       e.preventDefault();
@@ -1363,6 +1800,31 @@
       };
       reader.readAsDataURL(file);
     });
+  }
+
+  function loadSampleImage(url, name = 'sample.png') {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const item = {
+        id: 'file_' + Date.now() + Math.random(),
+        name: name,
+        file: null,
+        img: img,
+        origW: img.naturalWidth || img.width,
+        origH: img.naturalHeight || img.height,
+        status: 'Sẵn sàng ✅'
+      };
+      state.files.push(item);
+      state.activeIndex = state.files.length - 1;
+      renderArtwork();
+      updateHistogram();
+      updateTelemetryLabels();
+      renderBatchTable();
+      recordHistory(`Nạp ảnh mẫu: ${name}`);
+      showToast(`Đã nạp thành công ảnh mẫu: ${name}`, 'image');
+    };
+    img.src = url;
   }
 
   async function pasteFromClipboard() {
@@ -1631,6 +2093,17 @@
     const m = $(modalId);
     if (!m) return;
     m.classList.add('open');
+
+    // Sync Watermark inputs if opened
+    if (modalId === 'modalWatermark') {
+      if (el.inputWatermarkText) el.inputWatermarkText.value = state.watermark.text || '';
+      if (el.selWatermarkPos) el.selWatermarkPos.value = state.watermark.pos || 'br';
+      if (el.selWatermarkColor) el.selWatermarkColor.value = state.watermark.color || 'white';
+      if (el.sliderWatermarkOpacity) el.sliderWatermarkOpacity.value = Math.round((state.watermark.opacity ?? 0.5) * 100);
+      if (el.lblWatermarkOpacity) el.lblWatermarkOpacity.textContent = `${Math.round((state.watermark.opacity ?? 0.5) * 100)}%`;
+      if (el.sliderWatermarkSize) el.sliderWatermarkSize.value = state.watermark.size || 28;
+      if (el.lblWatermarkSize) el.lblWatermarkSize.textContent = `${state.watermark.size || 28}px`;
+    }
 
     // Sync inpaint canvas if opened
     if (modalId === 'modalInpaint' && el.inpaintBaseCanvas && el.inpaintMaskCanvas && state.activeIndex >= 0) {

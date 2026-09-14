@@ -3254,61 +3254,97 @@ class OmniImageStudioApp(ctk.CTk):
             self.status_label.configure(text_color=color)
 
 
+def start_local_server(root_dir):
+    """Starts a quiet localhost HTTP server to serve web studio assets without CORS/tainted canvas issues."""
+    import socket
+    import socketserver
+    import http.server
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('127.0.0.1', 0))
+        port = s.getsockname()[1]
+
+    class QuietHandler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=root_dir, **kwargs)
+
+        def log_message(self, format, *args):
+            pass
+
+    server = socketserver.TCPServer(('127.0.0.1', port), QuietHandler)
+    t = threading.Thread(target=server.serve_forever, daemon=True)
+    t.start()
+    return port, server
+
+
 def launch_studio_webview():
-    """Launch modern Studio desktop application via Microsoft Edge WebView2."""
-    try:
-        import webview
-    except ImportError:
-        return False
+    """Launch modern Studio desktop application via Microsoft Edge WebView2 with browser fallback."""
+    import webbrowser
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
     candidates = [
-        os.path.join(base_dir, "..", "index.html"),
-        os.path.join(base_dir, "index.html"),
-        os.path.join(os.getcwd(), "index.html"),
-        os.path.join(getattr(sys, "_MEIPASS", ""), "index.html")
+        getattr(sys, "_MEIPASS", ""),
+        os.path.abspath(os.path.join(base_dir, "..")),
+        base_dir,
+        os.path.dirname(sys.executable),
+        os.getcwd()
     ]
-    index_path = None
+    root_dir = None
     for c in candidates:
-        if c and os.path.exists(c):
-            index_path = os.path.abspath(c)
+        if c and os.path.exists(os.path.join(c, "index.html")):
+            root_dir = os.path.abspath(c)
             break
 
-    if not index_path:
+    if not root_dir:
         return False
 
-    class StudioBridgeAPI:
-        def select_files(self):
-            import tkinter as tk
-            from tkinter import filedialog
-            root = tk.Tk()
-            root.withdraw()
-            files = filedialog.askopenfilenames(
-                title="Lumina Studio Pro — Chọn File Ảnh",
-                filetypes=[("Image Files", "*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.gif;*.tiff;*.ico"), ("All Files", "*.*")]
-            )
-            root.destroy()
-            return list(files)
+    port, _ = start_local_server(root_dir)
+    app_url = f"http://127.0.0.1:{port}/index.html"
 
-        def open_folder(self, path=None):
-            if not path or not os.path.exists(path):
-                path = os.path.abspath(os.getcwd())
-            os.startfile(path)
-            return True
+    # Try Edge WebView2 window
+    try:
+        import webview
 
-    api = StudioBridgeAPI()
-    file_url = f"file:///{index_path.replace(chr(92), '/')}"
-    window = webview.create_window(
-        title="Lumina Studio Pro — Light Studio Precision v2.4",
-        url=file_url,
-        width=1440,
-        height=900,
-        min_size=(1024, 700),
-        js_api=api,
-        background_color="#F8FAFC"
-    )
-    webview.start(gui="edgechromium", debug=False)
-    return True
+        class StudioBridgeAPI:
+            def select_files(self):
+                import tkinter as tk
+                from tkinter import filedialog
+                root = tk.Tk()
+                root.withdraw()
+                files = filedialog.askopenfilenames(
+                    title="Lumina Studio Pro — Chọn File Ảnh",
+                    filetypes=[("Image Files", "*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.gif;*.tiff;*.ico"), ("All Files", "*.*")]
+                )
+                root.destroy()
+                return list(files)
+
+            def open_folder(self, path=None):
+                if not path or not os.path.exists(path):
+                    path = os.path.abspath(os.getcwd())
+                os.startfile(path)
+                return True
+
+        api = StudioBridgeAPI()
+        window = webview.create_window(
+            title="Lumina Studio Pro — Light Studio Precision v2.4",
+            url=app_url,
+            width=1440,
+            height=900,
+            min_size=(1024, 700),
+            js_api=api,
+            background_color="#F8FAFC"
+        )
+        webview.start(gui="edgechromium", debug=False)
+        return True
+    except Exception as e:
+        print("Edge Chromium WebView2 unavailable, launching in system browser:", e)
+        webbrowser.open(app_url)
+        try:
+            while True:
+                time.sleep(1)
+        except (KeyboardInterrupt, SystemExit):
+            pass
+        return True
 
 
 # ─── ENTRY POINT ─────────────────────────────────────────────────────────────
