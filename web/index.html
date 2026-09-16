@@ -974,57 +974,127 @@
 
   <!-- MODAL 4: FORMATS, PRESETS & RESIZING -->
   <div class="studio-modal-backdrop" id="modalFormats">
-    <div class="studio-modal-card w-[720px]">
+    <div class="studio-modal-card w-[780px] max-w-[95vw]">
       <div class="h-14 px-6 bg-slate-50 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
         <div class="flex items-center gap-2">
           <span class="material-symbols-outlined text-indigo-600 text-[20px]">photo_size_select_large</span>
-          <h3 class="font-headline-sm font-semibold text-slate-900 text-sm">Xuất Định Dạng, Khung Hình &amp; Nén Ảnh</h3>
+          <h3 class="font-headline-sm font-semibold text-slate-900 text-sm">Xuất Định Dạng, Khung Hình &amp; Điều Chỉnh Kích Thước</h3>
         </div>
-        <button type="button" class="text-slate-400 hover:text-slate-700 p-1 rounded-lg" data-close-modal="modalFormats">
+        <button type="button" class="text-slate-400 hover:text-slate-700 p-1 rounded-lg cursor-pointer" data-close-modal="modalFormats">
           <span class="material-symbols-outlined text-[20px]">close</span>
         </button>
       </div>
-      <div class="p-6 flex flex-col gap-5 overflow-y-auto max-h-[70vh]">
+      <div class="p-6 flex flex-col gap-5 overflow-y-auto max-h-[75vh]">
         <!-- Formats Selector -->
         <div class="flex flex-col gap-2">
-          <label class="text-xs font-semibold text-slate-700">Chọn định dạng xuất:</label>
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-semibold text-slate-700">1. Chọn định dạng xuất:</label>
+            <span class="text-[11px] text-slate-500 font-medium" id="lblFormatHint">WEBP: Nén tối ưu nhất cho website hiện đại</span>
+          </div>
           <div class="grid grid-cols-4 gap-2" id="modalFormatGrid">
-            <button type="button" class="format-btn active px-3 py-2 rounded-xl border border-indigo-500 bg-indigo-50 text-indigo-700 font-semibold text-xs" data-fmt="WEBP">WEBP (Khuyên dùng)</button>
-            <button type="button" class="format-btn px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium text-xs hover:bg-slate-50" data-fmt="PNG">PNG (Trong suốt)</button>
-            <button type="button" class="format-btn px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium text-xs hover:bg-slate-50" data-fmt="JPEG">JPEG (Chuẩn Web)</button>
-            <button type="button" class="format-btn px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium text-xs hover:bg-slate-50" data-fmt="ICO">ICO (Favicon)</button>
-            <button type="button" class="format-btn px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium text-xs hover:bg-slate-50" data-fmt="PDF">PDF (Văn bản)</button>
-            <button type="button" class="format-btn px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium text-xs hover:bg-slate-50" data-fmt="BMP">BMP (Bitmap)</button>
-            <button type="button" class="format-btn px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium text-xs hover:bg-slate-50" data-fmt="TIFF">TIFF (In ấn)</button>
-            <button type="button" class="format-btn px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium text-xs hover:bg-slate-50" data-fmt="SVG">SVG (Vector)</button>
+            <button type="button" class="format-btn active px-3 py-2 rounded-xl border border-indigo-500 bg-indigo-50 text-indigo-700 font-semibold text-xs cursor-pointer" data-fmt="WEBP">WEBP (Khuyên dùng)</button>
+            <button type="button" class="format-btn px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium text-xs hover:bg-slate-50 cursor-pointer" data-fmt="PNG">PNG (Trong suốt)</button>
+            <button type="button" class="format-btn px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium text-xs hover:bg-slate-50 cursor-pointer" data-fmt="JPEG">JPEG (Chuẩn Web)</button>
+            <button type="button" class="format-btn px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium text-xs hover:bg-slate-50 cursor-pointer" data-fmt="ICO">ICO (Favicon)</button>
+            <button type="button" class="format-btn px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium text-xs hover:bg-slate-50 cursor-pointer" data-fmt="PDF">PDF (Tài liệu)</button>
+            <button type="button" class="format-btn px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium text-xs hover:bg-slate-50 cursor-pointer" data-fmt="BMP">BMP (Bitmap)</button>
+            <button type="button" class="format-btn px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium text-xs hover:bg-slate-50 cursor-pointer" data-fmt="TIFF">TIFF (In ấn)</button>
+            <button type="button" class="format-btn px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium text-xs hover:bg-slate-50 cursor-pointer" data-fmt="SVG">SVG (Vector)</button>
           </div>
         </div>
+
+        <!-- Section 2: Resizing & Dimensions -->
+        <div class="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col gap-3.5">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-[18px] text-indigo-600">aspect_ratio</span>
+              <label class="text-xs font-semibold text-slate-900">2. Kích thước &amp; Khung hình xuất ảnh:</label>
+            </div>
+            <button type="button" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 cursor-pointer" id="btnResetDimsModal">
+              <span class="material-symbols-outlined text-[15px]">restart_alt</span>
+              <span>Khôi phục gốc</span>
+            </button>
+          </div>
+
+          <!-- Preset Dimensions Selector -->
+          <div class="flex flex-col gap-1.5">
+            <span class="text-[11px] font-medium text-slate-600">Mẫu kích thước mạng xã hội &amp; màn hình (Presets):</span>
+            <select id="selPresetModal" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white text-slate-800 focus:border-indigo-600 outline-none cursor-pointer">
+              <option value="">── Giữ nguyên kích thước gốc ──</option>
+              <option value="1200x630">Facebook Bài viết (1200 × 630)</option>
+              <option value="820x312">Facebook Ảnh bìa (820 × 312)</option>
+              <option value="1080x1080">Instagram Vuông 1:1 (1080 × 1080)</option>
+              <option value="1080x1920">Story / TikTok / Reels 9:16 (1080 × 1920)</option>
+              <option value="1200x675">Twitter / X Post 16:9 (1200 × 675)</option>
+              <option value="1280x720">YouTube Thumbnail 16:9 (1280 × 720)</option>
+              <option value="2560x1440">YouTube Banner 16:9 (2560 × 1440)</option>
+              <option value="1920x1080">Full HD 1080p (1920 × 1080)</option>
+              <option value="3840x2160">4K Ultra HD (3840 × 2160)</option>
+              <option value="32x32">Favicon Web Icon (32 × 32)</option>
+              <option value="128x128">Standard App Icon (128 × 128)</option>
+              <option value="512x512">High-Res App Icon (512 × 512)</option>
+            </select>
+          </div>
+
+          <!-- Custom Width, Height, Lock Aspect -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+            <div class="flex items-center gap-2">
+              <div class="flex-1 flex flex-col gap-1">
+                <span class="text-[11px] font-medium text-slate-600">Rộng (Width px):</span>
+                <input type="number" id="inputExportWidth" min="1" max="16000" class="w-full px-3 py-2 text-xs font-mono font-semibold rounded-xl border border-slate-200 bg-white text-slate-800 focus:border-indigo-600 outline-none" placeholder="Rộng"/>
+              </div>
+              
+              <!-- Lock Aspect Toggle Button -->
+              <button type="button" class="mt-4 p-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors shadow-2xs cursor-pointer flex-shrink-0" id="btnToggleLockAspect" title="Bật/Tắt khóa tỉ lệ khung hình">
+                <span class="material-symbols-outlined text-[18px]" id="iconLockAspect">link</span>
+              </button>
+
+              <div class="flex-1 flex flex-col gap-1">
+                <span class="text-[11px] font-medium text-slate-600">Cao (Height px):</span>
+                <input type="number" id="inputExportHeight" min="1" max="16000" class="w-full px-3 py-2 text-xs font-mono font-semibold rounded-xl border border-slate-200 bg-white text-slate-800 focus:border-indigo-600 outline-none" placeholder="Cao"/>
+              </div>
+            </div>
+
+            <!-- Fit Mode -->
+            <div class="flex flex-col gap-1">
+              <span class="text-[11px] font-medium text-slate-600">Chế độ khớp khung (Fit Mode):</span>
+              <select id="selFitModeModal" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white text-slate-800 focus:border-indigo-600 outline-none cursor-pointer">
+                <option value="stretch">Kéo dãn trực tiếp (Stretch)</option>
+                <option value="contain">Vừa khung giữ tỉ lệ (Contain - Nền trong suốt)</option>
+                <option value="cover">Lấp đầy cắt góc (Cover - Crop)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Quick Scale Percentages -->
+          <div class="flex items-center gap-1.5 pt-1">
+            <span class="text-[11px] font-medium text-slate-600 mr-1">Thu phóng nhanh:</span>
+            <div class="flex items-center gap-1 flex-wrap flex-1" id="quickScaleBtns">
+              <button type="button" class="btn-scale px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 text-xs font-semibold cursor-pointer transition-colors" data-scale="25">25%</button>
+              <button type="button" class="btn-scale px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 text-xs font-semibold cursor-pointer transition-colors" data-scale="50">50%</button>
+              <button type="button" class="btn-scale px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 text-xs font-semibold cursor-pointer transition-colors" data-scale="75">75%</button>
+              <button type="button" class="btn-scale px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-600 text-xs font-semibold cursor-pointer transition-colors" data-scale="100">100%</button>
+              <button type="button" class="btn-scale px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 text-xs font-semibold cursor-pointer transition-colors" data-scale="150">150%</button>
+              <button type="button" class="btn-scale px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 text-xs font-semibold cursor-pointer transition-colors" data-scale="200">200%</button>
+            </div>
+            <span class="text-xs font-mono font-semibold text-indigo-600 bg-white border border-slate-200 px-2 py-0.5 rounded-lg shadow-2xs" id="lblResolutionPreview">0 × 0</span>
+          </div>
+        </div>
+
         <!-- Quality Slider -->
-        <div class="flex flex-col gap-2">
+        <div class="flex flex-col gap-2" id="boxQualitySlider">
           <div class="flex items-center justify-between text-xs font-semibold text-slate-700">
-            <span>Chất lượng nén ảnh:</span>
+            <span>3. Chất lượng nén ảnh:</span>
             <span class="font-mono text-indigo-600" id="lblQualityModal">90%</span>
           </div>
           <input type="range" id="sliderQualityModal" min="10" max="100" value="90" class="w-full studio-range-slider"/>
         </div>
-        <!-- Preset Dimensions -->
-        <div class="flex flex-col gap-2">
-          <label class="text-xs font-semibold text-slate-700">Khung hình theo mạng xã hội (Preset Size):</label>
-          <select id="selPresetModal" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 text-slate-800 focus:border-indigo-600">
-            <option value="">Giữ nguyên kích thước gốc (3840 x 2160 UHD)</option>
-            <option value="fb_post">Facebook Bài viết (1200 x 630)</option>
-            <option value="fb_square">Instagram Vuông (1080 x 1080)</option>
-            <option value="fb_story">Story / TikTok / Reels (1080 x 1920)</option>
-            <option value="yt_thumb">YouTube Thumbnail (1280 x 720)</option>
-            <option value="banner_web">Web Banner Full HD (1920 x 1080)</option>
-            <option value="ico_32">Favicon Icon (32 x 32)</option>
-          </select>
-        </div>
       </div>
       <div class="h-16 px-6 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0">
-        <button type="button" class="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-200" data-close-modal="modalFormats">Hủy</button>
-        <button type="button" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-md" id="btnConfirmExportFormat">
-          Xuất &amp; Tải Ảnh Về Máy
+        <button type="button" class="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-200 cursor-pointer" data-close-modal="modalFormats">Hủy</button>
+        <button type="button" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-md cursor-pointer flex items-center gap-1.5" id="btnConfirmExportFormat">
+          <span class="material-symbols-outlined text-[18px]">download</span>
+          <span>Xuất &amp; Tải Ảnh Về Máy</span>
         </button>
       </div>
     </div>

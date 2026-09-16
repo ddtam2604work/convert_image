@@ -35,12 +35,22 @@ class NativeImageEngine:
             return calc_w, max(1, int(new_h))
 
     @staticmethod
-    def resize_image(image, target_w, target_h, fit_mode="stretch"):
+    def scale_by_percent(orig_w, orig_h, percent):
+        """Calculate scaled dimensions by percentage (e.g. 25, 50, 100, 200)"""
+        p = max(1.0, float(percent)) / 100.0
+        new_w = max(1, int(round(orig_w * p)))
+        new_h = max(1, int(round(orig_h * p)))
+        return new_w, new_h
+
+    @staticmethod
+    def resize_image(image, target_w, target_h, fit_mode="stretch", bg_color=None):
         """Resize image using high-quality Lanczos resampling"""
         orig_w, orig_h = image.size
+        target_w = max(1, int(target_w))
+        target_h = max(1, int(target_h))
         
         if fit_mode == "contain":
-            # Fit inside box preserving aspect ratio, padding with transparent/white background
+            # Fit inside box preserving aspect ratio, padding with transparent/white/custom background
             image_ratio = orig_w / orig_h
             target_ratio = target_w / target_h
             
@@ -54,10 +64,15 @@ class NativeImageEngine:
             
             resized_inner = image.resize((scale_w, scale_h), Image.Resampling.LANCZOS)
             mode = "RGBA" if image.mode in ("RGBA", "LA") or (image.mode == "P" and "transparency" in image.info) else "RGB"
-            canvas = Image.new(mode, (target_w, target_h), (0, 0, 0, 0) if mode == "RGBA" else (255, 255, 255))
+            
+            if bg_color is not None:
+                canvas = Image.new("RGBA" if mode == "RGBA" else "RGB", (target_w, target_h), bg_color)
+            else:
+                canvas = Image.new(mode, (target_w, target_h), (0, 0, 0, 0) if mode == "RGBA" else (255, 255, 255))
+                
             pad_x = (target_w - scale_w) // 2
             pad_y = (target_h - scale_h) // 2
-            canvas.paste(resized_inner, (pad_x, pad_y))
+            canvas.paste(resized_inner, (pad_x, pad_y), mask=resized_inner if mode == "RGBA" else None)
             return canvas
             
         elif fit_mode == "cover":

@@ -421,27 +421,37 @@ class OmniImageStudioApp(ctk.CTk):
         pinned_actions.grid(row=2, column=0, sticky="ew", padx=0, pady=0)
         pinned_actions.grid_columnconfigure(0, weight=1)
 
+        self.btn_export_single = ctk.CTkButton(
+            pinned_actions,
+            text="💾   XUẤT ẢNH ĐANG CHỌN",
+            height=36, corner_radius=8,
+            font=ctk.CTkFont("Segoe UI", 12, "bold"),
+            fg_color=ACCENT, hover_color=ACCENT_HOVER,
+            command=self.export_current_selected_image
+        )
+        self.btn_export_single.grid(row=0, column=0, padx=12, pady=(10, 4), sticky="ew")
+
         self.btn_start = ctk.CTkButton(
             pinned_actions,
-            text="⚡   BẮT ĐẦU CHUYỂN ĐỔI",
-            height=44, corner_radius=9,
-            font=ctk.CTkFont("Segoe UI", 13, "bold"),
+            text="⚡   CHUYỂN ĐỔI HÀNG LOẠT",
+            height=38, corner_radius=8,
+            font=ctk.CTkFont("Segoe UI", 12, "bold"),
             fg_color=SUCCESS, hover_color=SUCCESS_HOVER,
             command=self.start_batch_conversion
         )
-        self.btn_start.grid(row=0, column=0, padx=12, pady=(10, 4), sticky="ew")
+        self.btn_start.grid(row=1, column=0, padx=12, pady=(0, 4), sticky="ew")
 
         self.btn_clear = ctk.CTkButton(
             pinned_actions,
             text="🗑  Làm trống danh sách",
-            height=28, corner_radius=6,
+            height=26, corner_radius=6,
             font=ctk.CTkFont("Segoe UI", 11),
             fg_color="transparent",
             text_color=(TEXT_MUTED_L, TEXT_MUTED_D),
             hover_color=(BG_SUB_LIGHT, BG_SUB_DARK),
             command=self.clear_all
         )
-        self.btn_clear.grid(row=1, column=0, padx=12, pady=(0, 10), sticky="ew")
+        self.btn_clear.grid(row=2, column=0, padx=12, pady=(0, 8), sticky="ew")
 
     # ── Sidebar Cards ────────────────────────────────────────────────────────
     def _build_format_card(self):
@@ -580,6 +590,36 @@ class OmniImageStudioApp(ctk.CTk):
         self.entry_h.grid(row=0, column=2, sticky="ew")
         self.entry_h.bind("<KeyRelease>", lambda e: self._on_dimension_input("height"))
 
+        # Scale Percentage Quick Selectors
+        scale_frame = ctk.CTkFrame(card, fg_color="transparent")
+        scale_frame.grid(row=2, column=0, padx=8, pady=(0, 4), sticky="ew")
+        for i in range(7):
+            scale_frame.grid_columnconfigure(i, weight=1)
+
+        scales = [25, 50, 75, 100, 150, 200]
+        for col_i, sc in enumerate(scales):
+            btn_sc = ctk.CTkButton(
+                scale_frame, text=f"{sc}%",
+                height=22, corner_radius=4,
+                font=ctk.CTkFont("Segoe UI", 9, "bold"),
+                fg_color=(BG_SUB_LIGHT, BG_SUB_DARK),
+                hover_color=ACCENT,
+                text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
+                command=lambda s=sc: self._on_scale_percent(s)
+            )
+            btn_sc.grid(row=0, column=col_i, padx=1, sticky="ew")
+
+        btn_reset = ctk.CTkButton(
+            scale_frame, text="↺ Gốc",
+            height=22, corner_radius=4,
+            font=ctk.CTkFont("Segoe UI", 9, "bold"),
+            fg_color=(BG_SUB_LIGHT, BG_SUB_DARK),
+            hover_color=SECONDARY,
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
+            command=self._reset_to_original_dims
+        )
+        btn_reset.grid(row=0, column=6, padx=1, sticky="ew")
+
         # Lock Aspect Ratio Checkbox
         self.lock_aspect_var = ctk.BooleanVar(value=True)
         self.chk_lock = ctk.CTkCheckBox(
@@ -590,11 +630,11 @@ class OmniImageStudioApp(ctk.CTk):
             fg_color=ACCENT, hover_color=ACCENT_HOVER,
             text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
         )
-        self.chk_lock.grid(row=2, column=0, padx=10, pady=(4, 6), sticky="w")
+        self.chk_lock.grid(row=3, column=0, padx=10, pady=(4, 6), sticky="w")
 
         # Fit Mode Dropdown
         fit_box = ctk.CTkFrame(card, fg_color="transparent")
-        fit_box.grid(row=3, column=0, padx=10, pady=(2, 10), sticky="ew")
+        fit_box.grid(row=4, column=0, padx=10, pady=(2, 10), sticky="ew")
         fit_box.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(
@@ -1018,6 +1058,15 @@ class OmniImageStudioApp(ctk.CTk):
         self.lbl_current_filename.pack(side="left", padx=8)
 
         # Quick Image & Canva Tools on right side of nav_bar
+        self.btn_nav_export = ctk.CTkButton(
+            nav_bar, text="💾  Xuất ảnh này", width=115, height=26, corner_radius=6,
+            font=ctk.CTkFont("Segoe UI", 10, "bold"),
+            fg_color=SUCCESS, hover_color=SUCCESS_HOVER,
+            text_color="white",
+            command=self.export_current_selected_image
+        )
+        self.btn_nav_export.pack(side="right", padx=(4, 6), pady=4)
+
         self.btn_nav_canva = ctk.CTkButton(
             nav_bar, text="✨  Canva Studio", width=115, height=26, corner_radius=6,
             font=ctk.CTkFont("Segoe UI", 10, "bold"),
@@ -1025,7 +1074,7 @@ class OmniImageStudioApp(ctk.CTk):
             text_color="white",
             command=self.open_canva_background_studio
         )
-        self.btn_nav_canva.pack(side="right", padx=(4, 6), pady=4)
+        self.btn_nav_canva.pack(side="right", padx=4, pady=4)
 
         self.btn_nav_erase = ctk.CTkButton(
             nav_bar, text="🎨  Xóa Logo Hiện", width=115, height=26, corner_radius=6,
@@ -1296,6 +1345,33 @@ class OmniImageStudioApp(ctk.CTk):
         except ValueError:
             pass
         self.schedule_live_preview()
+
+    def _on_scale_percent(self, percent):
+        if self.current_preview_index < 0 or not self.loaded_files:
+            return
+        item = self.loaded_files[self.current_preview_index]
+        ow, oh = item["orig_w"], item["orig_h"]
+        nw, nh = NativeImageEngine.scale_by_percent(ow, oh, percent)
+        self.entry_w.delete(0, "end")
+        self.entry_w.insert(0, str(nw))
+        self.entry_h.delete(0, "end")
+        self.entry_h.insert(0, str(nh))
+        self.preset_menu.set("── Chọn kích thước mẫu ──")
+        self.schedule_live_preview()
+        self._set_status(f"Kích thước {percent}%: {nw} × {nh} px", ACCENT)
+
+    def _reset_to_original_dims(self):
+        if self.current_preview_index < 0 or not self.loaded_files:
+            return
+        item = self.loaded_files[self.current_preview_index]
+        ow, oh = item["orig_w"], item["orig_h"]
+        self.entry_w.delete(0, "end")
+        self.entry_w.insert(0, str(ow))
+        self.entry_h.delete(0, "end")
+        self.entry_h.insert(0, str(oh))
+        self.preset_menu.set("── Chọn kích thước mẫu ──")
+        self.schedule_live_preview()
+        self._set_status(f"Đã khôi phục kích thước gốc: {ow} × {oh} px", ACCENT)
 
     # =========================================================================
     # FILE MANAGEMENT & CLIPBOARD
@@ -2578,8 +2654,17 @@ class OmniImageStudioApp(ctk.CTk):
             )
             if out_path:
                 ext = os.path.splitext(out_path)[1].lstrip(".").upper() or "PNG"
-                NativeImageEngine.save_image(state["composite_img"], out_path, target_format=ext, quality=95)
-                messagebox.showinfo("Đã Lưu", f"Đã lưu thành công tại:\n{out_path}")
+                img_to_save = state["composite_img"]
+                try:
+                    tw = max(1, int(self.entry_w.get()))
+                    th = max(1, int(self.entry_h.get()))
+                    if (tw != img_to_save.width or th != img_to_save.height) and tw > 0 and th > 0:
+                        fit = self.fit_mode_menu.get().split("(")[1].rstrip(")")
+                        img_to_save = NativeImageEngine.resize_image(img_to_save, tw, th, fit_mode=fit)
+                except Exception:
+                    pass
+                NativeImageEngine.save_image(img_to_save, out_path, target_format=ext, quality=95)
+                messagebox.showinfo("Đã Lưu", f"Đã lưu thành công ({img_to_save.width}×{img_to_save.height} px) tại:\n{out_path}")
 
         dialog.after(80, lambda: trigger_cutout(force=False))
 
@@ -2990,8 +3075,17 @@ class OmniImageStudioApp(ctk.CTk):
             if out_path:
                 ext = os.path.splitext(out_path)[1].lstrip(".").upper()
                 fmt = ext if ext in ("PNG", "JPG", "JPEG", "WEBP", "BMP") else "PNG"
-                NativeImageEngine.save_image(state["working_img"], out_path, target_format=fmt)
-                messagebox.showinfo("Thành Công", f"Đã lưu ảnh sạch logo thành công vào:\n{out_path}")
+                img_to_save = state["working_img"]
+                try:
+                    tw = max(1, int(self.entry_w.get()))
+                    th = max(1, int(self.entry_h.get()))
+                    if (tw != img_to_save.width or th != img_to_save.height) and tw > 0 and th > 0:
+                        fit = self.fit_mode_menu.get().split("(")[1].rstrip(")")
+                        img_to_save = NativeImageEngine.resize_image(img_to_save, tw, th, fit_mode=fit)
+                except Exception:
+                    pass
+                NativeImageEngine.save_image(img_to_save, out_path, target_format=fmt)
+                messagebox.showinfo("Thành Công", f"Đã lưu ảnh sạch logo thành công ({img_to_save.width}×{img_to_save.height} px) vào:\n{out_path}")
 
         btn_save_file = ctk.CTkButton(
             card_save,
@@ -3143,6 +3237,108 @@ class OmniImageStudioApp(ctk.CTk):
         canvas.bind("<Configure>", lambda e: render_canvas())
 
         dialog.after(80, render_canvas)
+
+    def export_current_selected_image(self):
+        """Export and save only the currently previewed image with user-specified dimensions and effects"""
+        if self.current_preview_index < 0 or not self.loaded_files:
+            messagebox.showwarning("Xuất Ảnh", "Vui lòng chọn một ảnh trong danh sách để xuất!")
+            return
+
+        item = self.loaded_files[self.current_preview_index]
+        fmt = self.format_segmented.get()
+        ext = FORMAT_EXT.get(fmt, fmt.lower())
+        base_name, _ = os.path.splitext(item["name"])
+        default_name = f"{base_name}_converted.{ext}"
+
+        filetypes = [
+            (f"Ảnh {fmt} (*.{ext})", f"*.{ext}"),
+            ("Tất cả tệp (*.*)", "*.*")
+        ]
+
+        out_path = filedialog.asksaveasfilename(
+            title=f"Lưu ảnh '{item['name']}' sau chuyển đổi",
+            initialfile=default_name,
+            filetypes=filetypes
+        )
+        if not out_path:
+            return
+
+        try:
+            self._set_status(f"Đang xử lý xuất ảnh: {os.path.basename(out_path)}…", WARNING)
+            img = item["img"].copy()
+
+            try:
+                tw = max(1, int(self.entry_w.get()))
+                th = max(1, int(self.entry_h.get()))
+            except ValueError:
+                tw = th = 0
+
+            fit = self.fit_mode_menu.get().split("(")[1].rstrip(")")
+            w = tw if tw > 0 else img.width
+            h = th if th > 0 else img.height
+
+            proc = NativeImageEngine.resize_image(img, w, h, fit_mode=fit)
+
+            rem_bg = self.var_remove_bg.get()
+            tol = int(self.slider_tolerance.get())
+            has_custom_bg = (self.canva_bg_mode.get() not in ("transparent", "") and bool(self.canva_bg_color.get()))
+
+            if rem_bg or has_custom_bg:
+                if rem_bg or proc.mode != "RGBA":
+                    proc = NativeImageEngine.remove_background(proc, tol)
+                if self.canva_bg_mode.get() != "transparent":
+                    proc = NativeImageEngine.apply_canva_background(
+                        proc,
+                        bg_type=self.canva_bg_mode.get(),
+                        bg_color=self.canva_bg_color.get(),
+                        orig_image=img,
+                        blur_radius=self.canva_blur_rad.get()
+                    )
+                if self.canva_shadow_enabled.get():
+                    proc = NativeImageEngine.apply_drop_shadow(
+                        proc,
+                        offset_x=self.canva_shadow_offset_x.get(),
+                        offset_y=self.canva_shadow_offset_y.get(),
+                        blur_radius=self.canva_shadow_blur.get(),
+                        opacity=self.canva_shadow_opacity.get()
+                    )
+                if self.canva_glow_enabled.get():
+                    proc = NativeImageEngine.apply_glow_outline(
+                        proc,
+                        outline_width=self.canva_glow_width.get(),
+                        outline_color=self.canva_glow_color,
+                        is_glow=self.canva_is_glow.get()
+                    )
+
+            sharp = int(self.slider_sharpen.get())
+            if sharp > 0:
+                proc = NativeImageEngine.apply_sharpen(proc, intensity=sharp)
+
+            if self.hidden_logo_img:
+                proc, _, _ = NativeImageEngine.embed_hidden_watermark(proc, self.hidden_logo_img)
+            elif self.var_clean_stego.get():
+                proc = NativeImageEngine.sanitize_hidden_watermark(proc)
+
+            qual = int(self.slider_quality.get())
+            chosen_ext = os.path.splitext(out_path)[1].lstrip(".").upper()
+            target_fmt = chosen_ext if chosen_ext in FORMAT_EXT else fmt
+
+            NativeImageEngine.save_image(proc, out_path, target_format=target_fmt, quality=qual)
+
+            item["status"] = "Thành công ✅"
+            item["out_path"] = out_path
+            self._render_queue_table()
+            self._set_status(f"✅  Đã lưu thành công tại: {out_path} ({proc.width}×{proc.height} px)", SUCCESS)
+
+            if messagebox.askyesno(
+                "Xuất Ảnh Thành Công",
+                f"Đã lưu ảnh thành công ({proc.width} × {proc.height} px):\n{out_path}\n\nBạn có muốn mở ảnh ngay không?"
+            ):
+                os.startfile(out_path)
+        except Exception as e:
+            self._set_status(f"❌  Lỗi khi xuất ảnh: {e}", DANGER)
+            messagebox.showerror("Lỗi Xuất Ảnh", f"Không thể lưu ảnh:\n{e}")
+
     def start_batch_conversion(self):
         if not self.loaded_files:
             messagebox.showwarning("Thông Báo", "Vui lòng thêm ít nhất một ảnh để chuyển đổi!")

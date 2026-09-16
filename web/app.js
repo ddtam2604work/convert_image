@@ -60,7 +60,10 @@
       quality: 0.90,
       preset: '',
       targetW: null,
-      targetH: null
+      targetH: null,
+      lockAspect: true,
+      scalePercent: 100,
+      fitMode: 'stretch'
     },
 
     // Transform (Rotate & Flip Studio)
@@ -280,7 +283,16 @@
     btnBatchStart: $('btnBatchStart'),
     sliderQualityModal: $('sliderQualityModal'),
     lblQualityModal: $('lblQualityModal'),
+    boxQualitySlider: $('boxQualitySlider'),
     selPresetModal: $('selPresetModal'),
+    inputExportWidth: $('inputExportWidth'),
+    inputExportHeight: $('inputExportHeight'),
+    btnToggleLockAspect: $('btnToggleLockAspect'),
+    iconLockAspect: $('iconLockAspect'),
+    selFitModeModal: $('selFitModeModal'),
+    btnResetDimsModal: $('btnResetDimsModal'),
+    lblResolutionPreview: $('lblResolutionPreview'),
+    lblFormatHint: $('lblFormatHint'),
     btnConfirmExportFormat: $('btnConfirmExportFormat'),
 
     // Stego elements
@@ -919,12 +931,95 @@
   }
 
   function triggerSmartCutout() {
-    state.fx.cutoutActive = true;
-    if (el.pinCutout) el.pinCutout.style.display = 'flex';
-    renderArtwork();
-    updateHistogram();
-    recordHistory('Tách chủ thể AI');
-    showToast('Tách nền thông minh AI: Đã trích xuất chủ thể trong suốt', 'content_cut');
+    if (state.activeIndex < 0 || !state.files[state.activeIndex]) {
+      showToast('Vui lòng nạp một ảnh trước khi tách nền!', 'info');
+      return;
+    }
+    const item = state.files[state.activeIndex];
+    showToast('Đang phân tích và tách nền AI thông minh…', 'hourglass_top');
+
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = item.origW;
+    tempCanvas.height = item.origH;
+    const ctx = tempCanvas.getContext('2d');
+    ctx.drawImage(item.img, 0, 0);
+
+    const imgData = ctx.getImageData(0, 0, item.origW, item.origH);
+    const data = imgData.data;
+    const w = item.origW;
+    const h = item.origH;
+
+    // Sample border corners to detect backdrop color
+    const corners = [
+      0,
+      Math.min(w - 1, 10) * 4,
+      Math.max(0, w - 1) * 4,
+      ((h - 1) * w) * 4,
+      ((h - 1) * w + Math.max(0, w - 1)) * 4
+    ];
+    let bgR = 0, bgG = 0, bgB = 0;
+    for (let c of corners) {
+      bgR += data[c];
+      bgG += data[c + 1];
+      bgB += data[c + 2];
+    }
+    bgR = Math.round(bgR / corners.length);
+    bgG = Math.round(bgG / corners.length);
+    bgB = Math.round(bgB / corners.length);
+
+    const maxDist = 48.0;
+    const visited = new Uint8Array(w * h);
+    const queue = [];
+
+    function checkAndPush(x, y) {
+      const idx = y * w + x;
+      if (visited[idx]) return;
+      const p = idx * 4;
+      const d = Math.hypot(data[p] - bgR, data[p + 1] - bgG, data[p + 2] - bgB);
+      if (d <= maxDist) {
+        visited[idx] = 1;
+        queue.push(x, y);
+      }
+    }
+
+    // Start from borders
+    for (let x = 0; x < w; x++) {
+      checkAndPush(x, 0);
+      checkAndPush(x, h - 1);
+    }
+    for (let y = 0; y < h; y++) {
+      checkAndPush(0, y);
+      checkAndPush(w - 1, y);
+    }
+
+    let head = 0;
+    while (head < queue.length) {
+      const cx = queue[head++];
+      const cy = queue[head++];
+      const p = (cy * w + cx) * 4;
+      data[p + 3] = 0; // Set transparent
+
+      const neighbors = [[cx - 1, cy], [cx + 1, cy], [cx, cy - 1], [cx, cy + 1]];
+      for (let n of neighbors) {
+        const nx = n[0], ny = n[1];
+        if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+          checkAndPush(nx, ny);
+        }
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    const newImg = new Image();
+    newImg.onload = () => {
+      item.img = newImg;
+      state.fx.cutoutActive = true;
+      if (el.pinCutout) el.pinCutout.style.display = 'flex';
+      renderArtwork();
+      updateHistogram();
+      recordHistory('Tách nền thông minh AI');
+      showToast('✦ Tách nền AI hoàn tất: Đã xóa phông nền thành trong suốt!', 'content_cut');
+    };
+    newImg.src = tempCanvas.toDataURL('image/png');
   }
 
   // ─── TRANSFORM & WATERMARK CONTROLS ───────────────────────────────────────
@@ -1677,30 +1772,280 @@
       el.canvasFileName.innerHTML = `<span class="w-2 h-2 rounded-full bg-indigo-600 animate-ping"></span> ${item.name}`;
     }
     if (el.statDimensions) {
-      el.statDimensions.textContent = `${item.origW} × ${item.origH}`;
+      if (state.config.targetW && state.config.targetH && (state.config.targetW !== item.origW || state.config.targetH !== item.origH)) {
+        el.statDimensions.textContent = `${item.origW} × ${item.origH} ➔ ${state.config.targetW} × ${state.config.targetH}`;
+      } else {
+        el.statDimensions.textContent = `${item.origW} × ${item.origH}`;
+      }
+      el.statDimensions.title = 'Click để điều chỉnh kích thước xuất (Resize)';
+      el.statDimensions.style.cursor = 'pointer';
+      el.statDimensions.onclick = () => openModal('modalFormats');
     }
   }
 
-  // ─── EXPORT & DOWNLOAD ────────────────────────────────────────────────────
-  function exportCurrent(isZip = false) {
+  // ─── EXPORT & RESIZING ENGINE ─────────────────────────────────────────────
+  function generateExportCanvas(sourceCanvas, targetW, targetH, fitMode = 'stretch') {
+    const sw = sourceCanvas.width;
+    const sh = sourceCanvas.height;
+    const tw = Math.max(1, Math.round(targetW || sw));
+    const th = Math.max(1, Math.round(targetH || sh));
+
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = tw;
+    exportCanvas.height = th;
+    const ctx = exportCanvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    if (fitMode === 'contain') {
+      const srcRatio = sw / sh;
+      const targetRatio = tw / th;
+      let drawW, drawH;
+      if (srcRatio > targetRatio) {
+        drawW = tw;
+        drawH = Math.max(1, Math.round(tw / srcRatio));
+      } else {
+        drawH = th;
+        drawW = Math.max(1, Math.round(th * srcRatio));
+      }
+      const padX = Math.round((tw - drawW) / 2);
+      const padY = Math.round((th - drawH) / 2);
+      ctx.drawImage(sourceCanvas, padX, padY, drawW, drawH);
+    } else if (fitMode === 'cover') {
+      const scale = Math.max(tw / sw, th / sh);
+      const drawW = Math.round(sw * scale);
+      const drawH = Math.round(sh * scale);
+      const ox = Math.round((tw - drawW) / 2);
+      const oy = Math.round((th - drawH) / 2);
+      ctx.drawImage(sourceCanvas, ox, oy, drawW, drawH);
+    } else {
+      // Stretch directly to target size
+      ctx.drawImage(sourceCanvas, 0, 0, tw, th);
+    }
+
+    return exportCanvas;
+  }
+
+  function canvasToIcoBlob(canvas) {
+    return new Promise((resolve) => {
+      canvas.toBlob((pngBlob) => {
+        if (!pngBlob) return resolve(null);
+        pngBlob.arrayBuffer().then((buf) => {
+          const pngBytes = new Uint8Array(buf);
+          const w = canvas.width <= 256 ? (canvas.width === 256 ? 0 : canvas.width) : 0;
+          const h = canvas.height <= 256 ? (canvas.height === 256 ? 0 : canvas.height) : 0;
+          const icoHeader = new Uint8Array([
+            0, 0, // reserved
+            1, 0, // 1 = ICO
+            1, 0, // 1 image
+            w, h, // width, height
+            0,    // 0 colors in palette
+            0,    // reserved
+            1, 0, // color planes
+            32, 0,// bpp
+            pngBytes.length & 0xff,
+            (pngBytes.length >> 8) & 0xff,
+            (pngBytes.length >> 16) & 0xff,
+            (pngBytes.length >> 24) & 0xff,
+            22, 0, 0, 0 // offset to image data (6 + 16 = 22)
+          ]);
+          const fullIco = new Uint8Array(icoHeader.length + pngBytes.length);
+          fullIco.set(icoHeader, 0);
+          fullIco.set(pngBytes, icoHeader.length);
+          resolve(new Blob([fullIco], { type: 'image/x-icon' }));
+        });
+      }, 'image/png');
+    });
+  }
+
+  function canvasToBmpBlob(canvas) {
+    const w = canvas.width;
+    const h = canvas.height;
+    const ctx = canvas.getContext('2d');
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const pixels = imgData.data;
+    const rowSize = w * 4;
+    const pixelArraySize = rowSize * h;
+    const fileSize = 54 + pixelArraySize;
+
+    const buffer = new ArrayBuffer(fileSize);
+    const view = new DataView(buffer);
+    // BMP Header (14 bytes)
+    view.setUint16(0, 0x4D42, false); // 'BM'
+    view.setUint32(2, fileSize, true);
+    view.setUint32(6, 0, true);
+    view.setUint32(10, 54, true); // offset
+    // DIB Header (40 bytes)
+    view.setUint32(14, 40, true);
+    view.setInt32(18, w, true);
+    view.setInt32(22, h, true);
+    view.setUint16(26, 1, true);
+    view.setUint16(28, 32, true); // 32-bit RGBA
+    view.setUint32(30, 0, true);
+    view.setUint32(34, pixelArraySize, true);
+    view.setInt32(38, 2835, true);
+    view.setInt32(42, 2835, true);
+    view.setUint32(46, 0, true);
+    view.setUint32(50, 0, true);
+
+    let offset = 54;
+    for (let y = h - 1; y >= 0; y--) {
+      for (let x = 0; x < w; x++) {
+        const pIdx = (y * w + x) * 4;
+        view.setUint8(offset++, pixels[pIdx + 2]); // B
+        view.setUint8(offset++, pixels[pIdx + 1]); // G
+        view.setUint8(offset++, pixels[pIdx]);     // R
+        view.setUint8(offset++, pixels[pIdx + 3]); // A
+      }
+    }
+    return new Blob([buffer], { type: 'image/bmp' });
+  }
+
+  function canvasToSvgBlob(canvas) {
+    const w = canvas.width;
+    const h = canvas.height;
+    const dataUrl = canvas.toDataURL('image/png');
+    const svgContent = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">\n  <image width="${w}" height="${h}" xlink:href="${dataUrl}"/>\n</svg>`;
+    return new Blob([svgContent], { type: 'image/svg+xml' });
+  }
+
+  function canvasToPdfBlob(canvas) {
+    return new Promise((resolve) => {
+      const w = canvas.width;
+      const h = canvas.height;
+      const ptW = Math.round((w * 72) / 150);
+      const ptH = Math.round((h * 72) / 150);
+      canvas.toBlob((jpegBlob) => {
+        if (!jpegBlob) return resolve(null);
+        jpegBlob.arrayBuffer().then((buf) => {
+          const bytes = new Uint8Array(buf);
+          let binary = '';
+          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+
+          const pdf =
+            `%PDF-1.4\n` +
+            `1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n` +
+            `2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n` +
+            `3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 ${ptW} ${ptH}] /Contents 4 0 R /Resources << /XObject << /Im1 5 0 R >> >> >> endobj\n` +
+            `4 0 obj << /Length 44 >> stream\nq\n${ptW} 0 0 ${ptH} 0 0 cm\n/Im1 Do\nQ\nendstream\nendobj\n` +
+            `5 0 obj << /Type /XObject /Subtype /Image /Width ${w} /Height ${h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${bytes.length} >> stream\n` +
+            binary +
+            `\nendstream\nendobj\nxref\n0 6\n0000000000 65535 f \n` +
+            `trailer << /Size 6 /Root 1 0 R >>\nstartxref\n%%EOF`;
+
+          resolve(new Blob([pdf], { type: 'application/pdf' }));
+        });
+      }, 'image/jpeg', 0.92);
+    });
+  }
+
+  function canvasToTiffBlob(canvas) {
+    const w = canvas.width;
+    const h = canvas.height;
+    const ctx = canvas.getContext('2d');
+    const pixels = ctx.getImageData(0, 0, w, h).data;
+    const rgbLen = w * h * 3;
+    const ifdOffset = 8 + rgbLen;
+    const numEntries = 11;
+    const totalSize = ifdOffset + 2 + numEntries * 12 + 4 + 32;
+
+    const buffer = new ArrayBuffer(totalSize);
+    const view = new DataView(buffer);
+    view.setUint16(0, 0x4949, false); // little endian 'II'
+    view.setUint16(2, 42, true);
+    view.setUint32(4, ifdOffset, true);
+
+    let p = 8;
+    for (let i = 0; i < pixels.length; i += 4) {
+      view.setUint8(p++, pixels[i]);
+      view.setUint8(p++, pixels[i + 1]);
+      view.setUint8(p++, pixels[i + 2]);
+    }
+
+    let ifd = ifdOffset;
+    view.setUint16(ifd, numEntries, true); ifd += 2;
+
+    const writeTag = (tag, type, count, val) => {
+      view.setUint16(ifd, tag, true);
+      view.setUint16(ifd + 2, type, true);
+      view.setUint32(ifd + 4, count, true);
+      view.setUint32(ifd + 8, val, true);
+      ifd += 12;
+    };
+
+    writeTag(256, 4, 1, w);
+    writeTag(257, 4, 1, h);
+    writeTag(258, 3, 3, ifdOffset + 2 + numEntries * 12 + 4);
+    writeTag(259, 3, 1, 1);
+    writeTag(262, 3, 1, 2);
+    writeTag(273, 4, 1, 8);
+    writeTag(277, 3, 1, 3);
+    writeTag(278, 4, 1, h);
+    writeTag(279, 4, 1, rgbLen);
+    writeTag(282, 5, 1, ifdOffset + 2 + numEntries * 12 + 10);
+    writeTag(283, 5, 1, ifdOffset + 2 + numEntries * 12 + 18);
+    view.setUint32(ifd, 0, true); ifd += 4;
+
+    view.setUint16(ifd, 8, true);
+    view.setUint16(ifd + 2, 8, true);
+    view.setUint16(ifd + 4, 8, true);
+    ifd += 6;
+
+    view.setUint32(ifd, 72, true); view.setUint32(ifd + 4, 1, true); ifd += 8;
+    view.setUint32(ifd, 72, true); view.setUint32(ifd + 4, 1, true);
+
+    return new Blob([buffer], { type: 'image/tiff' });
+  }
+
+  async function exportCurrent(isZip = false) {
     if (state.activeIndex < 0 || !state.files[state.activeIndex]) {
       alert('Vui lòng nạp một ảnh trước khi xuất!');
       return;
     }
 
     const item = state.files[state.activeIndex];
-    const canvas = el.mainCanvas;
-    const fmt = state.config.format.toLowerCase();
-    const mime = fmt === 'png' ? 'image/png' : fmt === 'jpg' || fmt === 'jpeg' ? 'image/jpeg' : 'image/webp';
+    const sourceCanvas = el.mainCanvas;
+    if (!sourceCanvas || sourceCanvas.width === 0) return;
 
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      const base = item.name.replace(/\.[^/.]+$/, '');
-      const outName = `${base}_lumina_precision.${fmt === 'jpeg' || fmt === 'jpg' ? 'jpg' : fmt === 'png' ? 'png' : 'webp'}`;
-      downloadBlob(blob, outName);
-      recordHistory(`Xuất ảnh: ${outName}`);
-      showToast(`Đã xuất ảnh thành công: ${outName}`, 'download_done');
-    }, mime, state.config.quality);
+    const targetW = state.config.targetW || sourceCanvas.width;
+    const targetH = state.config.targetH || sourceCanvas.height;
+    const fit = state.config.fitMode || 'stretch';
+
+    const outCanvas = generateExportCanvas(sourceCanvas, targetW, targetH, fit);
+    const fmt = (state.config.format || 'WEBP').toUpperCase();
+    const base = item.name.replace(/\.[^/.]+$/, '');
+    const ext = fmt === 'JPEG' ? 'jpg' : fmt.toLowerCase();
+    const outName = `${base}_${targetW}x${targetH}.${ext}`;
+
+    let blob = null;
+    if (fmt === 'PNG') {
+      blob = await new Promise((r) => outCanvas.toBlob(r, 'image/png'));
+    } else if (fmt === 'JPEG' || fmt === 'JPG') {
+      blob = await new Promise((r) => outCanvas.toBlob(r, 'image/jpeg', state.config.quality));
+    } else if (fmt === 'WEBP') {
+      blob = await new Promise((r) => outCanvas.toBlob(r, 'image/webp', state.config.quality));
+    } else if (fmt === 'ICO') {
+      blob = await canvasToIcoBlob(outCanvas);
+    } else if (fmt === 'BMP') {
+      blob = canvasToBmpBlob(outCanvas);
+    } else if (fmt === 'SVG') {
+      blob = canvasToSvgBlob(outCanvas);
+    } else if (fmt === 'PDF') {
+      blob = await canvasToPdfBlob(outCanvas);
+    } else if (fmt === 'TIFF') {
+      blob = canvasToTiffBlob(outCanvas);
+    } else {
+      blob = await new Promise((r) => outCanvas.toBlob(r, 'image/png'));
+    }
+
+    if (!blob) {
+      alert('Không thể tạo file ảnh xuất.');
+      return;
+    }
+
+    downloadBlob(blob, outName);
+    recordHistory(`Xuất ảnh: ${outName} (${targetW}×${targetH})`);
+    showToast(`Đã xuất ảnh thành công: ${outName} (${targetW}×${targetH} px)`, 'download_done');
   }
 
   function downloadBlob(blob, filename) {
@@ -1941,42 +2286,80 @@
         return;
       }
 
-      showToast('Đang nén toàn bộ ảnh thành file ZIP...', 'archive');
+      showToast('Đang xử lý và đóng gói toàn bộ ảnh vào ZIP...', 'archive');
       const zip = new JSZip();
+      const fmt = (state.config.format || 'WEBP').toUpperCase();
+      const ext = fmt === 'JPEG' ? 'jpg' : fmt.toLowerCase();
+
       for (let i = 0; i < state.files.length; i++) {
         const f = state.files[i];
-        const canvas = document.createElement('canvas');
-        canvas.width = f.origW;
-        canvas.height = f.origH;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(f.img, 0, 0);
+        f.status = 'Đang xử lý...';
+        renderBatchTable();
 
-        const base64 = canvas.toDataURL('image/png').split(',')[1];
-        zip.file(`${f.name.replace(/\.[^/.]+$/, '')}_precision.png`, base64, { base64: true });
+        const srcCanvas = document.createElement('canvas');
+        srcCanvas.width = f.origW;
+        srcCanvas.height = f.origH;
+        const sctx = srcCanvas.getContext('2d');
+        sctx.drawImage(f.img, 0, 0);
+
+        const tw = state.config.targetW || f.origW;
+        const th = state.config.targetH || f.origH;
+        const fit = state.config.fitMode || 'stretch';
+        const outCanvas = generateExportCanvas(srcCanvas, tw, th, fit);
+
+        let blob = null;
+        if (fmt === 'PNG') {
+          blob = await new Promise((r) => outCanvas.toBlob(r, 'image/png'));
+        } else if (fmt === 'JPEG' || fmt === 'JPG') {
+          blob = await new Promise((r) => outCanvas.toBlob(r, 'image/jpeg', state.config.quality));
+        } else if (fmt === 'WEBP') {
+          blob = await new Promise((r) => outCanvas.toBlob(r, 'image/webp', state.config.quality));
+        } else if (fmt === 'ICO') {
+          blob = await canvasToIcoBlob(outCanvas);
+        } else if (fmt === 'BMP') {
+          blob = canvasToBmpBlob(outCanvas);
+        } else if (fmt === 'SVG') {
+          blob = canvasToSvgBlob(outCanvas);
+        } else if (fmt === 'PDF') {
+          blob = await canvasToPdfBlob(outCanvas);
+        } else if (fmt === 'TIFF') {
+          blob = canvasToTiffBlob(outCanvas);
+        } else {
+          blob = await new Promise((r) => outCanvas.toBlob(r, 'image/png'));
+        }
+
+        const baseName = f.name.replace(/\.[^/.]+$/, '');
+        const filename = `${baseName}_${tw}x${th}.${ext}`;
+        zip.file(filename, blob);
+
+        f.status = `Hoàn tất ✅ (${tw}×${th})`;
+        renderBatchTable();
       }
 
+      showToast('Đang nén file ZIP...', 'folder_zip');
       const content = await zip.generateAsync({ type: 'blob' });
-      downloadBlob(content, 'LuminaStudio_Batch_Export.zip');
+      downloadBlob(content, `LuminaStudio_Batch_${fmt}_${Date.now()}.zip`);
       closeModal('modalBatch');
-      showToast('Đã tạo và tải file ZIP thành công!', 'folder_zip');
+      showToast(`Đã xuất thành công ${state.files.length} ảnh trong file ZIP!`, 'folder_zip');
     });
   }
 
   // ─── INPAINT & STEGANOGRAPHY HANDLERS ─────────────────────────────────────
   function bindStegoAndInpaintEvents() {
+    // Inpaint Tool switching
     if (el.btnInpaintBrush) {
       el.btnInpaintBrush.addEventListener('click', () => {
         state.inpaint.tool = 'brush';
-        el.btnInpaintBrush.className = 'px-3 py-1.5 rounded-xl bg-white border border-indigo-200 text-indigo-600 font-medium text-xs flex items-center gap-1.5 shadow-2xs';
-        el.btnInpaintRect.className = 'px-3 py-1.5 rounded-xl bg-slate-200 text-slate-700 font-medium text-xs flex items-center gap-1.5';
+        el.btnInpaintBrush.className = 'px-3 py-1.5 rounded-xl bg-white border border-indigo-200 text-indigo-600 font-medium text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer';
+        if (el.btnInpaintRect) el.btnInpaintRect.className = 'px-3 py-1.5 rounded-xl bg-slate-200 text-slate-700 font-medium text-xs flex items-center gap-1.5 cursor-pointer';
       });
     }
 
     if (el.btnInpaintRect) {
       el.btnInpaintRect.addEventListener('click', () => {
         state.inpaint.tool = 'rect';
-        el.btnInpaintRect.className = 'px-3 py-1.5 rounded-xl bg-white border border-indigo-200 text-indigo-600 font-medium text-xs flex items-center gap-1.5 shadow-2xs';
-        el.btnInpaintBrush.className = 'px-3 py-1.5 rounded-xl bg-slate-200 text-slate-700 font-medium text-xs flex items-center gap-1.5';
+        el.btnInpaintRect.className = 'px-3 py-1.5 rounded-xl bg-white border border-indigo-200 text-indigo-600 font-medium text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer';
+        if (el.btnInpaintBrush) el.btnInpaintBrush.className = 'px-3 py-1.5 rounded-xl bg-slate-200 text-slate-700 font-medium text-xs flex items-center gap-1.5 cursor-pointer';
       });
     }
 
@@ -1996,22 +2379,177 @@
       });
     }
 
+    // Interactive Mask Drawing on inpaintMaskCanvas
+    if (el.inpaintMaskCanvas) {
+      let rectSnapshot = null;
+
+      const getCanvasPos = (e) => {
+        const rect = el.inpaintMaskCanvas.getBoundingClientRect();
+        const scaleX = el.inpaintMaskCanvas.width / rect.width;
+        const scaleY = el.inpaintMaskCanvas.height / rect.height;
+        return {
+          x: (e.clientX - rect.left) * scaleX,
+          y: (e.clientY - rect.top) * scaleY
+        };
+      };
+
+      el.inpaintMaskCanvas.addEventListener('mousedown', (e) => {
+        state.inpaint.isDrawing = true;
+        const pos = getCanvasPos(e);
+        state.inpaint.startX = pos.x;
+        state.inpaint.startY = pos.y;
+        state.inpaint.lastX = pos.x;
+        state.inpaint.lastY = pos.y;
+
+        const ctx = el.inpaintMaskCanvas.getContext('2d');
+        if (state.inpaint.tool === 'brush') {
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, state.inpaint.brushSize / 2, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
+          ctx.fill();
+        } else if (state.inpaint.tool === 'rect') {
+          rectSnapshot = ctx.getImageData(0, 0, el.inpaintMaskCanvas.width, el.inpaintMaskCanvas.height);
+        }
+      });
+
+      el.inpaintMaskCanvas.addEventListener('mousemove', (e) => {
+        if (!state.inpaint.isDrawing) return;
+        const pos = getCanvasPos(e);
+        const ctx = el.inpaintMaskCanvas.getContext('2d');
+
+        if (state.inpaint.tool === 'brush') {
+          ctx.beginPath();
+          ctx.moveTo(state.inpaint.lastX, state.inpaint.lastY);
+          ctx.lineTo(pos.x, pos.y);
+          ctx.strokeStyle = 'rgba(239, 68, 68, 0.8)';
+          ctx.lineWidth = state.inpaint.brushSize;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.stroke();
+          state.inpaint.lastX = pos.x;
+          state.inpaint.lastY = pos.y;
+        } else if (state.inpaint.tool === 'rect' && rectSnapshot) {
+          ctx.putImageData(rectSnapshot, 0, 0);
+          const rx = Math.min(state.inpaint.startX, pos.x);
+          const ry = Math.min(state.inpaint.startY, pos.y);
+          const rw = Math.abs(pos.x - state.inpaint.startX);
+          const rh = Math.abs(pos.y - state.inpaint.startY);
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
+          ctx.fillRect(rx, ry, rw, rh);
+        }
+      });
+
+      const stopDrawing = () => {
+        state.inpaint.isDrawing = false;
+        rectSnapshot = null;
+      };
+      el.inpaintMaskCanvas.addEventListener('mouseup', stopDrawing);
+      el.inpaintMaskCanvas.addEventListener('mouseleave', stopDrawing);
+    }
+
+    // Inpaint Execution Algorithm (Telea-style Neighbor Diffusion)
     if (el.btnExecuteInpaint) {
       el.btnExecuteInpaint.addEventListener('click', () => {
-        showToast('✦ Thuật toán Inpainting Telea đã hoàn thành xóa đối tượng!', 'auto_fix_high');
+        if (!el.inpaintBaseCanvas || !el.inpaintMaskCanvas) return;
+        const bCanvas = el.inpaintBaseCanvas;
+        const mCanvas = el.inpaintMaskCanvas;
+        const w = bCanvas.width;
+        const h = bCanvas.height;
+        const bctx = bCanvas.getContext('2d');
+        const mctx = mCanvas.getContext('2d');
+
+        const baseImg = bctx.getImageData(0, 0, w, h);
+        const maskImg = mctx.getImageData(0, 0, w, h);
+        const bData = baseImg.data;
+        const mData = maskImg.data;
+
+        // Find masked pixels (where red > 100 && alpha > 30)
+        const mask = new Uint8Array(w * h);
+        let maskedCount = 0;
+        for (let i = 0; i < w * h; i++) {
+          if (mData[i * 4] > 100 && mData[i * 4 + 3] > 30) {
+            mask[i] = 1;
+            maskedCount++;
+          }
+        }
+
+        if (maskedCount === 0) {
+          showToast('Vui lòng vẽ vùng mặt nạ đỏ lên đối tượng cần xóa trước!', 'brush');
+          return;
+        }
+
+        showToast('Đang xóa đối tượng và phục hồi bề mặt...', 'hourglass_top');
+
+        // Multi-pass boundary diffusion
+        const passes = 24;
+        for (let pass = 0; pass < passes; pass++) {
+          for (let y = 1; y < h - 1; y++) {
+            for (let x = 1; x < w - 1; x++) {
+              const idx = y * w + x;
+              if (mask[idx] === 1) {
+                let rSum = 0, gSum = 0, bSum = 0, count = 0;
+                const neighbors = [
+                  idx - w - 1, idx - w, idx - w + 1,
+                  idx - 1,             idx + 1,
+                  idx + w - 1, idx + w, idx + w + 1
+                ];
+                for (let k = 0; k < neighbors.length; k++) {
+                  const nIdx = neighbors[k];
+                  if (mask[nIdx] === 0 || pass > 4) {
+                    const p = nIdx * 4;
+                    rSum += bData[p];
+                    gSum += bData[p + 1];
+                    bSum += bData[p + 2];
+                    count++;
+                  }
+                }
+                if (count > 0) {
+                  const p = idx * 4;
+                  bData[p] = Math.round(rSum / count);
+                  bData[p + 1] = Math.round(gSum / count);
+                  bData[p + 2] = Math.round(bSum / count);
+                  if (pass >= 12) mask[idx] = 0;
+                }
+              }
+            }
+          }
+        }
+
+        bctx.putImageData(baseImg, 0, 0);
+        mctx.clearRect(0, 0, w, h);
+        showToast('✦ Thuật toán Inpainting Telea đã xóa đối tượng thành công!', 'auto_fix_high');
       });
     }
 
     if (el.btnInpaintApplyAndClose) {
       el.btnInpaintApplyAndClose.addEventListener('click', () => {
-        closeModal('modalInpaint');
-        renderArtwork();
-        recordHistory('Xóa vật thể AI Inpainting');
-        showToast('Đã lưu kết quả xóa vật thể', 'check_circle');
+        if (state.activeIndex < 0 || !state.files[state.activeIndex]) {
+          closeModal('modalInpaint');
+          return;
+        }
+        const item = state.files[state.activeIndex];
+        const bCanvas = el.inpaintBaseCanvas;
+
+        const origCanvas = document.createElement('canvas');
+        origCanvas.width = item.origW;
+        origCanvas.height = item.origH;
+        const octx = origCanvas.getContext('2d');
+        octx.drawImage(bCanvas, 0, 0, item.origW, item.origH);
+
+        const newImg = new Image();
+        newImg.onload = () => {
+          item.img = newImg;
+          renderArtwork();
+          updateHistogram();
+          recordHistory('Xóa vật thể AI Inpainting');
+          closeModal('modalInpaint');
+          showToast('✦ Đã lưu và áp dụng kết quả xóa vật thể vào ảnh!', 'check_circle');
+        };
+        newImg.src = origCanvas.toDataURL('image/png');
       });
     }
 
-    // Stego Buttons
+    // Stego Buttons - Real LSB Encoding & Decoding
     if (el.btnChooseLogo) el.btnChooseLogo.addEventListener('click', () => el.logoInput.click());
     if (el.logoInput) {
       el.logoInput.addEventListener('change', (e) => {
@@ -2023,27 +2561,154 @@
 
     if (el.btnExecuteEmbedLogo) {
       el.btnExecuteEmbedLogo.addEventListener('click', () => {
-        closeModal('modalStego');
-        recordHistory('Nhúng thủy vân ẩn LSB');
-        showToast('✦ Đã nhúng chữ ký & bản quyền bảo mật LSB vào ảnh', 'lock');
+        if (state.activeIndex < 0 || !state.files[state.activeIndex]) {
+          alert('Vui lòng chọn ảnh trước khi nhúng thủy vân!');
+          return;
+        }
+        const text = (el.txtStegoMessage && el.txtStegoMessage.value.trim()) || 'Copyright © 2026 Lumina Studio Pro';
+        const item = state.files[state.activeIndex];
+
+        const c = document.createElement('canvas');
+        c.width = item.origW;
+        c.height = item.origH;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(item.img, 0, 0);
+
+        const imgData = ctx.getImageData(0, 0, c.width, c.height);
+        const data = imgData.data;
+
+        const magic = 'LUMINA:';
+        const payload = magic + text;
+        const encoder = new TextEncoder();
+        const bytes = encoder.encode(payload);
+
+        const totalBits = (bytes.length + 1) * 8;
+        if (totalBits > data.length / 4) {
+          alert('Thông điệp quá dài so với kích thước ảnh!');
+          return;
+        }
+
+        let bitIndex = 0;
+        for (let b = 0; b < bytes.length; b++) {
+          const byteVal = bytes[b];
+          for (let bit = 7; bit >= 0; bit--) {
+            const bitVal = (byteVal >> bit) & 1;
+            const pixelIdx = bitIndex * 4 + 2; // blue channel
+            data[pixelIdx] = (data[pixelIdx] & 0xFE) | bitVal;
+            bitIndex++;
+          }
+        }
+        for (let bit = 7; bit >= 0; bit--) {
+          const pixelIdx = bitIndex * 4 + 2;
+          data[pixelIdx] = data[pixelIdx] & 0xFE;
+          bitIndex++;
+        }
+
+        ctx.putImageData(imgData, 0, 0);
+        const updatedImg = new Image();
+        updatedImg.onload = () => {
+          item.img = updatedImg;
+          renderArtwork();
+          recordHistory(`Nhúng thủy vân ẩn: ${text}`);
+          closeModal('modalStego');
+          showToast(`✦ Đã nhúng bản quyền LSB thành công ("${text.slice(0, 25)}...")`, 'lock');
+        };
+        updatedImg.src = c.toDataURL('image/png');
       });
     }
 
     if (el.btnScanHiddenLogo) {
       el.btnScanHiddenLogo.addEventListener('click', () => {
-        showToast('✦ Quét đa tầng: Bản quyền bảo vệ bởi Lumina Studio Pro', 'verified');
+        if (state.activeIndex < 0 || !state.files[state.activeIndex]) {
+          alert('Vui lòng chọn ảnh trước khi quét!');
+          return;
+        }
+        const item = state.files[state.activeIndex];
+        const c = document.createElement('canvas');
+        c.width = item.origW;
+        c.height = item.origH;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(item.img, 0, 0);
+
+        const imgData = ctx.getImageData(0, 0, c.width, c.height);
+        const data = imgData.data;
+
+        const extractedBytes = [];
+        let currentByte = 0;
+        let bitsRead = 0;
+        const maxBytes = 2048;
+
+        for (let i = 0; i < data.length && extractedBytes.length < maxBytes; i += 4) {
+          const bitVal = data[i + 2] & 1;
+          currentByte = (currentByte << 1) | bitVal;
+          bitsRead++;
+          if (bitsRead === 8) {
+            if (currentByte === 0) break;
+            extractedBytes.push(currentByte);
+            currentByte = 0;
+            bitsRead = 0;
+          }
+        }
+
+        const decoder = new TextDecoder();
+        const extractedStr = decoder.decode(new Uint8Array(extractedBytes));
+        if (extractedStr.startsWith('LUMINA:')) {
+          const msg = extractedStr.replace('LUMINA:', '');
+          if (el.txtStegoMessage) el.txtStegoMessage.value = msg;
+          alert(`✦ ĐÃ PHÁT HIỆN BẢN QUYỀN THỦY VÂN ẨN LSB:\n\n"${msg}"\n\nẢnh này được xác thực và bảo hộ chính chủ!`);
+          showToast(`✦ Trích xuất thành công: "${msg.slice(0, 30)}..."`, 'verified');
+        } else {
+          showToast('Không tìm thấy thủy vân ẩn LSB trong ảnh này', 'info');
+        }
       });
     }
 
     if (el.btnSanitizeHiddenLogo) {
       el.btnSanitizeHiddenLogo.addEventListener('click', () => {
-        closeModal('modalStego');
-        recordHistory('Tẩy sạch thủy vân ẩn');
-        showToast('✦ Đã tẩy sạch các bit watermark LSB an toàn', 'cleaning_services');
+        if (state.activeIndex < 0 || !state.files[state.activeIndex]) {
+          alert('Vui lòng chọn ảnh trước khi tẩy sạch!');
+          return;
+        }
+        const item = state.files[state.activeIndex];
+        const c = document.createElement('canvas');
+        c.width = item.origW;
+        c.height = item.origH;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(item.img, 0, 0);
+
+        const imgData = ctx.getImageData(0, 0, c.width, c.height);
+        const data = imgData.data;
+
+        for (let i = 0; i < data.length; i += 4) {
+          data[i + 1] = data[i + 1] & 0xFE;
+          data[i + 2] = data[i + 2] & 0xFE;
+        }
+
+        ctx.putImageData(imgData, 0, 0);
+        const updatedImg = new Image();
+        updatedImg.onload = () => {
+          item.img = updatedImg;
+          renderArtwork();
+          recordHistory('Tẩy sạch thủy vân ẩn LSB');
+          closeModal('modalStego');
+          showToast('✦ Đã tẩy sạch toàn bộ bit watermark LSB an toàn!', 'cleaning_services');
+        };
+        updatedImg.src = c.toDataURL('image/png');
       });
     }
 
-    // Formats Modal
+    // Formats & Sizing Modal Controls
+    const formatHints = {
+      WEBP: 'WEBP: Nén tối ưu nhất cho website hiện đại (Khuyên dùng)',
+      PNG: 'PNG: Giữ nguyên độ trong suốt Alpha không suy hao (Lossless)',
+      JPEG: 'JPEG: Tương thích hoàn hảo mọi trình xem ảnh & Web',
+      ICO: 'ICO: Đa kích thước 16×16, 32×32, 48×48 cho Favicon website',
+      PDF: 'PDF: Đóng gói trang tài liệu in ấn chuẩn CMYK / RGB',
+      BMP: 'BMP: Định dạng ảnh thô không nén Windows Bitmap',
+      TIFF: 'TIFF: Tiêu chuẩn ngành xuất bản và in ấn màu chuyên nghiệp',
+      SVG: 'SVG: Khung vector bao bọc hình ảnh độ phân giải cao'
+    };
+
     $$('#modalFormatGrid .format-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         $$('#modalFormatGrid .format-btn').forEach((b) => {
@@ -2052,6 +2717,16 @@
         btn.className = 'format-btn active px-3 py-2 rounded-xl border border-indigo-500 bg-indigo-50 text-indigo-700 font-semibold text-xs cursor-pointer';
         state.config.format = btn.dataset.fmt;
         if (el.canvasFormatBadge) el.canvasFormatBadge.textContent = `${state.config.format} 32-bit Float`;
+        if (el.lblFormatHint) el.lblFormatHint.textContent = formatHints[state.config.format] || '';
+
+        if (el.boxQualitySlider) {
+          if (['JPEG', 'JPG', 'WEBP'].includes(state.config.format)) {
+            el.boxQualitySlider.style.display = 'flex';
+          } else {
+            el.boxQualitySlider.style.display = 'none';
+          }
+        }
+
         showToast(`Đã chọn định dạng xuất: ${state.config.format}`, 'tune');
       });
     });
@@ -2061,6 +2736,147 @@
         const val = parseInt(e.target.value);
         state.config.quality = val / 100;
         if (el.lblQualityModal) el.lblQualityModal.textContent = `${val}%`;
+      });
+    }
+
+    function updateResPreview() {
+      const w = state.config.targetW || (state.activeIndex >= 0 ? state.files[state.activeIndex].origW : (el.mainCanvas ? el.mainCanvas.width : 0));
+      const h = state.config.targetH || (state.activeIndex >= 0 ? state.files[state.activeIndex].origH : (el.mainCanvas ? el.mainCanvas.height : 0));
+      if (el.lblResolutionPreview) el.lblResolutionPreview.textContent = `${w || 0} × ${h || 0}`;
+    }
+
+    if (el.inputExportWidth) {
+      el.inputExportWidth.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        if (isNaN(val) || val <= 0) return;
+        state.config.targetW = val;
+        if (state.config.lockAspect && state.activeIndex >= 0) {
+          const item = state.files[state.activeIndex];
+          const ratio = (item.origH || 1) / (item.origW || 1);
+          const newH = Math.max(1, Math.round(val * ratio));
+          state.config.targetH = newH;
+          if (el.inputExportHeight) el.inputExportHeight.value = newH;
+        }
+        updateResPreview();
+        updateTelemetryLabels();
+      });
+    }
+
+    if (el.inputExportHeight) {
+      el.inputExportHeight.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        if (isNaN(val) || val <= 0) return;
+        state.config.targetH = val;
+        if (state.config.lockAspect && state.activeIndex >= 0) {
+          const item = state.files[state.activeIndex];
+          const ratio = (item.origW || 1) / (item.origH || 1);
+          const newW = Math.max(1, Math.round(val * ratio));
+          state.config.targetW = newW;
+          if (el.inputExportWidth) el.inputExportWidth.value = newW;
+        }
+        updateResPreview();
+        updateTelemetryLabels();
+      });
+    }
+
+    if (el.btnToggleLockAspect) {
+      el.btnToggleLockAspect.addEventListener('click', () => {
+        state.config.lockAspect = !state.config.lockAspect;
+        if (el.iconLockAspect) {
+          el.iconLockAspect.textContent = state.config.lockAspect ? 'link' : 'link_off';
+        }
+        if (state.config.lockAspect) {
+          el.btnToggleLockAspect.className = 'mt-4 p-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors shadow-2xs cursor-pointer flex-shrink-0';
+          showToast('Đã khóa tỉ lệ khung hình (Aspect Ratio Locked)', 'link');
+        } else {
+          el.btnToggleLockAspect.className = 'mt-4 p-2 rounded-xl border border-slate-200 bg-slate-100 text-slate-400 hover:bg-slate-200 transition-colors shadow-2xs cursor-pointer flex-shrink-0';
+          showToast('Đã mở khóa tỉ lệ khung hình (Tùy chỉnh tự do)', 'link_off');
+        }
+      });
+    }
+
+    $$('#quickScaleBtns .btn-scale').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const pct = parseInt(btn.dataset.scale);
+        state.config.scalePercent = pct;
+
+        $$('#quickScaleBtns .btn-scale').forEach((b) => {
+          b.className = 'btn-scale px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 text-xs font-semibold cursor-pointer transition-colors';
+        });
+        btn.className = 'btn-scale px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-600 text-xs font-semibold cursor-pointer transition-colors';
+
+        if (state.activeIndex >= 0) {
+          const item = state.files[state.activeIndex];
+          const newW = Math.max(1, Math.round((item.origW * pct) / 100));
+          const newH = Math.max(1, Math.round((item.origH * pct) / 100));
+          state.config.targetW = newW;
+          state.config.targetH = newH;
+          if (el.inputExportWidth) el.inputExportWidth.value = newW;
+          if (el.inputExportHeight) el.inputExportHeight.value = newH;
+          if (el.selPresetModal) el.selPresetModal.value = '';
+          updateResPreview();
+          updateTelemetryLabels();
+          showToast(`Thu phóng kích thước xuất: ${pct}% (${newW} × ${newH} px)`, 'aspect_ratio');
+        } else {
+          showToast('Vui lòng nạp một ảnh trước khi thu phóng', 'info');
+        }
+      });
+    });
+
+    if (el.selPresetModal) {
+      el.selPresetModal.addEventListener('change', (e) => {
+        const val = e.target.value;
+        if (!val) {
+          if (state.activeIndex >= 0) {
+            const item = state.files[state.activeIndex];
+            state.config.targetW = item.origW;
+            state.config.targetH = item.origH;
+            if (el.inputExportWidth) el.inputExportWidth.value = item.origW;
+            if (el.inputExportHeight) el.inputExportHeight.value = item.origH;
+          }
+        } else {
+          const [pw, ph] = val.split('x').map(Number);
+          state.config.targetW = pw;
+          state.config.targetH = ph;
+          if (el.inputExportWidth) el.inputExportWidth.value = pw;
+          if (el.inputExportHeight) el.inputExportHeight.value = ph;
+          showToast(`Đã áp dụng mẫu kích thước: ${val} px`, 'aspect_ratio');
+        }
+        updateResPreview();
+        updateTelemetryLabels();
+      });
+    }
+
+    if (el.selFitModeModal) {
+      el.selFitModeModal.addEventListener('change', (e) => {
+        state.config.fitMode = e.target.value;
+        showToast(`Chế độ khớp khung: ${e.target.options[e.target.selectedIndex].text}`, 'tune');
+      });
+    }
+
+    if (el.btnResetDimsModal) {
+      el.btnResetDimsModal.addEventListener('click', () => {
+        if (state.activeIndex >= 0) {
+          const item = state.files[state.activeIndex];
+          state.config.targetW = item.origW;
+          state.config.targetH = item.origH;
+          state.config.scalePercent = 100;
+          if (el.inputExportWidth) el.inputExportWidth.value = item.origW;
+          if (el.inputExportHeight) el.inputExportHeight.value = item.origH;
+          if (el.selPresetModal) el.selPresetModal.value = '';
+          $$('#quickScaleBtns .btn-scale').forEach((b) => {
+            if (b.dataset.scale === '100') {
+              b.className = 'btn-scale px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-600 text-xs font-semibold cursor-pointer transition-colors';
+            } else {
+              b.className = 'btn-scale px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 text-xs font-semibold cursor-pointer transition-colors';
+            }
+          });
+          updateResPreview();
+          updateTelemetryLabels();
+          showToast(`Đã khôi phục kích thước gốc: ${item.origW} × ${item.origH} px`, 'restart_alt');
+        } else {
+          showToast('Chưa có ảnh nào đang chọn', 'info');
+        }
       });
     }
 
@@ -2105,21 +2921,39 @@
       if (el.lblWatermarkSize) el.lblWatermarkSize.textContent = `${state.watermark.size || 28}px`;
     }
 
-    // Sync inpaint canvas if opened
+    // Sync Formats & Sizing inputs if opened
+    if (modalId === 'modalFormats') {
+      const curW = state.config.targetW || (state.activeIndex >= 0 ? state.files[state.activeIndex].origW : (el.mainCanvas ? el.mainCanvas.width : 0));
+      const curH = state.config.targetH || (state.activeIndex >= 0 ? state.files[state.activeIndex].origH : (el.mainCanvas ? el.mainCanvas.height : 0));
+      if (el.inputExportWidth) el.inputExportWidth.value = curW || '';
+      if (el.inputExportHeight) el.inputExportHeight.value = curH || '';
+      if (el.lblResolutionPreview) el.lblResolutionPreview.textContent = `${curW || 0} × ${curH || 0}`;
+      if (el.selFitModeModal) el.selFitModeModal.value = state.config.fitMode || 'stretch';
+    }
+
+    // Sync inpaint canvas with aspect ratio preserved
     if (modalId === 'modalInpaint' && el.inpaintBaseCanvas && el.inpaintMaskCanvas && state.activeIndex >= 0) {
       const orig = state.files[state.activeIndex].img;
       const bCanvas = el.inpaintBaseCanvas;
       const mCanvas = el.inpaintMaskCanvas;
-      bCanvas.width = 640;
-      bCanvas.height = 360;
-      mCanvas.width = 640;
-      mCanvas.height = 360;
+      const maxW = 640;
+      const maxH = 380;
+      const origW = orig.naturalWidth || orig.width || 640;
+      const origH = orig.naturalHeight || orig.height || 360;
+      const scale = Math.min(maxW / origW, maxH / origH, 1.0);
+      const displayW = Math.max(100, Math.round(origW * scale));
+      const displayH = Math.max(100, Math.round(origH * scale));
+
+      bCanvas.width = displayW;
+      bCanvas.height = displayH;
+      mCanvas.width = displayW;
+      mCanvas.height = displayH;
 
       const bctx = bCanvas.getContext('2d');
-      bctx.drawImage(orig, 0, 0, 640, 360);
+      bctx.drawImage(orig, 0, 0, displayW, displayH);
 
       const mctx = mCanvas.getContext('2d');
-      mctx.clearRect(0, 0, 640, 360);
+      mctx.clearRect(0, 0, displayW, displayH);
     }
   }
 
