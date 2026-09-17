@@ -88,11 +88,18 @@
 
     // Inpaint Studio
     inpaint: {
-      tool: 'brush',
+      tool: 'brush', // 'brush', 'rect', 'eraser'
       brushSize: 24,
+      dilate: 2,
       isDrawing: false,
       lastX: null,
-      lastY: null
+      lastY: null,
+      startX: null,
+      startY: null,
+      history: [],
+      originalSnapshot: null,
+      currentCleanedSnapshot: null,
+      lastAppliedMask: null
     },
 
     // Pan state
@@ -267,15 +274,29 @@
     modalStego: $('modalStego'),
     modalBatch: $('modalBatch'),
     modalFormats: $('modalFormats'),
+    btnNavEraseLogo: $('btnNavEraseLogo'),
+    hudEraseLogo: $('hudEraseLogo'),
+    btnOpenEraseVisibleFromStego: $('btnOpenEraseVisibleFromStego'),
     inpaintBaseCanvas: $('inpaintBaseCanvas'),
     inpaintMaskCanvas: $('inpaintMaskCanvas'),
     btnInpaintBrush: $('btnInpaintBrush'),
     btnInpaintRect: $('btnInpaintRect'),
+    btnInpaintEraser: $('btnInpaintEraser'),
+    btnInpaintUndo: $('btnInpaintUndo'),
+    btnInpaintCompare: $('btnInpaintCompare'),
     sliderInpaintBrush: $('sliderInpaintBrush'),
     lblInpaintBrushSize: $('lblInpaintBrushSize'),
+    sliderInpaintDilate: $('sliderInpaintDilate'),
+    lblInpaintDilate: $('lblInpaintDilate'),
     btnInpaintClearMask: $('btnInpaintClearMask'),
     btnExecuteInpaint: $('btnExecuteInpaint'),
+    btnInpaintApplyAll: $('btnInpaintApplyAll'),
     btnInpaintApplyAndClose: $('btnInpaintApplyAndClose'),
+    btnPresetBottomRight: $('btnPresetBottomRight'),
+    btnPresetBottomLeft: $('btnPresetBottomLeft'),
+    btnPresetTopRight: $('btnPresetTopRight'),
+    btnPresetTopLeft: $('btnPresetTopLeft'),
+    btnPresetBottomBar: $('btnPresetBottomBar'),
     batchQueueBody: $('batchQueueBody'),
     lblBatchTotal: $('lblBatchTotal'),
     btnBatchAddFiles: $('btnBatchAddFiles'),
@@ -362,6 +383,7 @@
     // Navigation Pills
     const navButtons = [
       { btn: el.btnNavEdit, action: () => showToast('Đang ở chế độ: Chỉnh sửa ảnh', 'tune') },
+      { btn: el.btnNavEraseLogo, action: () => openModal('modalInpaint') },
       { btn: el.btnNavGenAI, action: () => openModal('modalInpaint') },
       { btn: el.btnNavBatch, action: () => openBatchModal() },
       { btn: el.btnNavLibrary, action: () => openModal('modalFormats') }
@@ -393,6 +415,15 @@
     if ($('menuItemFilter')) $('menuItemFilter').addEventListener('click', () => openModal('modalFormats'));
     if ($('menuItemView')) $('menuItemView').addEventListener('click', () => fitZoomToCanvas());
     if ($('menuItemWindow')) $('menuItemWindow').addEventListener('click', () => showToast('Bố cục: Light Studio Precision v2.4', 'dashboard'));
+
+    // Contextual HUD and Stego links to Inpaint
+    if (el.hudEraseLogo) el.hudEraseLogo.addEventListener('click', () => openModal('modalInpaint'));
+    if (el.btnOpenEraseVisibleFromStego) {
+      el.btnOpenEraseVisibleFromStego.addEventListener('click', () => {
+        closeModal('modalStego');
+        openModal('modalInpaint');
+      });
+    }
 
     // Hardware RTX toggle
     if (el.btnToggleRTX) {
@@ -2347,22 +2378,27 @@
   // ─── INPAINT & STEGANOGRAPHY HANDLERS ─────────────────────────────────────
   function bindStegoAndInpaintEvents() {
     // Inpaint Tool switching
-    if (el.btnInpaintBrush) {
-      el.btnInpaintBrush.addEventListener('click', () => {
-        state.inpaint.tool = 'brush';
-        el.btnInpaintBrush.className = 'px-3 py-1.5 rounded-xl bg-white border border-indigo-200 text-indigo-600 font-medium text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer';
-        if (el.btnInpaintRect) el.btnInpaintRect.className = 'px-3 py-1.5 rounded-xl bg-slate-200 text-slate-700 font-medium text-xs flex items-center gap-1.5 cursor-pointer';
-      });
-    }
+    const setToolActive = (toolName) => {
+      state.inpaint.tool = toolName;
+      const activeClass = 'px-3 py-1.5 rounded-xl bg-white border border-indigo-200 text-indigo-600 font-medium text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer';
+      const inactiveClass = 'px-3 py-1.5 rounded-xl bg-slate-200 text-slate-700 font-medium text-xs flex items-center gap-1.5 cursor-pointer hover:bg-slate-300 transition-colors';
 
-    if (el.btnInpaintRect) {
-      el.btnInpaintRect.addEventListener('click', () => {
-        state.inpaint.tool = 'rect';
-        el.btnInpaintRect.className = 'px-3 py-1.5 rounded-xl bg-white border border-indigo-200 text-indigo-600 font-medium text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer';
-        if (el.btnInpaintBrush) el.btnInpaintBrush.className = 'px-3 py-1.5 rounded-xl bg-slate-200 text-slate-700 font-medium text-xs flex items-center gap-1.5 cursor-pointer';
-      });
-    }
+      if (el.btnInpaintBrush) el.btnInpaintBrush.className = toolName === 'brush' ? activeClass : inactiveClass;
+      if (el.btnInpaintRect) el.btnInpaintRect.className = toolName === 'rect' ? activeClass : inactiveClass;
+      if (el.btnInpaintEraser) el.btnInpaintEraser.className = toolName === 'eraser' ? activeClass : inactiveClass;
 
+      if (el.inpaintMaskCanvas) {
+        if (toolName === 'brush') el.inpaintMaskCanvas.style.cursor = 'crosshair';
+        else if (toolName === 'rect') el.inpaintMaskCanvas.style.cursor = 'cell';
+        else if (toolName === 'eraser') el.inpaintMaskCanvas.style.cursor = 'grab';
+      }
+    };
+
+    if (el.btnInpaintBrush) el.btnInpaintBrush.addEventListener('click', () => setToolActive('brush'));
+    if (el.btnInpaintRect) el.btnInpaintRect.addEventListener('click', () => setToolActive('rect'));
+    if (el.btnInpaintEraser) el.btnInpaintEraser.addEventListener('click', () => setToolActive('eraser'));
+
+    // Sliders: Brush Size & Dilation
     if (el.sliderInpaintBrush) {
       el.sliderInpaintBrush.addEventListener('input', (e) => {
         const val = parseInt(e.target.value);
@@ -2371,15 +2407,95 @@
       });
     }
 
-    if (el.btnInpaintClearMask && el.inpaintMaskCanvas) {
-      el.btnInpaintClearMask.addEventListener('click', () => {
-        const ctx = el.inpaintMaskCanvas.getContext('2d');
-        ctx.clearRect(0, 0, el.inpaintMaskCanvas.width, el.inpaintMaskCanvas.height);
-        showToast('Đã xóa mặt nạ vẽ', 'clear');
+    if (el.sliderInpaintDilate) {
+      el.sliderInpaintDilate.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        state.inpaint.dilate = val;
+        if (el.lblInpaintDilate) el.lblInpaintDilate.textContent = `${val}px`;
       });
     }
 
-    // Interactive Mask Drawing on inpaintMaskCanvas
+    // 1-Click Corner Presets
+    const applyCornerPreset = (cornerKey) => {
+      if (!el.inpaintMaskCanvas) return;
+      const mCanvas = el.inpaintMaskCanvas;
+      const ctx = mCanvas.getContext('2d');
+
+      // Save undo snapshot
+      state.inpaint.history.push(ctx.getImageData(0, 0, mCanvas.width, mCanvas.height));
+      if (state.inpaint.history.length > 10) state.inpaint.history.shift();
+
+      const w = mCanvas.width;
+      const h = mCanvas.height;
+      const bw = Math.max(36, Math.round(w * 0.24));
+      const bh = Math.max(20, Math.round(h * 0.10));
+      const margin = 10;
+      let rx = 0, ry = 0, rw = bw, rh = bh;
+
+      if (cornerKey === 'bottom_right') {
+        rx = Math.max(0, w - bw - margin);
+        ry = Math.max(0, h - bh - margin);
+      } else if (cornerKey === 'bottom_left') {
+        rx = margin;
+        ry = Math.max(0, h - bh - margin);
+      } else if (cornerKey === 'top_right') {
+        rx = Math.max(0, w - bw - margin);
+        ry = margin;
+      } else if (cornerKey === 'top_left') {
+        rx = margin;
+        ry = margin;
+      } else if (cornerKey === 'bottom_bar') {
+        rx = margin;
+        ry = Math.max(0, h - bh - margin);
+        rw = Math.max(20, w - margin * 2);
+        rh = bh;
+      }
+
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
+      ctx.fillRect(rx, ry, rw, rh);
+
+      const labels = {
+        bottom_right: 'Góc Dưới Phải (TikTok/CapCut)',
+        bottom_left: 'Góc Dưới Trái (Dấu Camera)',
+        top_right: 'Góc Trên Phải (Logo TV)',
+        top_left: 'Góc Trên Trái (App Logo)',
+        bottom_bar: 'Dải Đáy (Phụ đề)'
+      };
+      showToast(`Đã khoanh vùng: ${labels[cornerKey] || cornerKey} ✓`, 'select_all');
+    };
+
+    if (el.btnPresetBottomRight) el.btnPresetBottomRight.addEventListener('click', () => applyCornerPreset('bottom_right'));
+    if (el.btnPresetBottomLeft) el.btnPresetBottomLeft.addEventListener('click', () => applyCornerPreset('bottom_left'));
+    if (el.btnPresetTopRight) el.btnPresetTopRight.addEventListener('click', () => applyCornerPreset('top_right'));
+    if (el.btnPresetTopLeft) el.btnPresetTopLeft.addEventListener('click', () => applyCornerPreset('top_left'));
+    if (el.btnPresetBottomBar) el.btnPresetBottomBar.addEventListener('click', () => applyCornerPreset('bottom_bar'));
+
+    // Undo action for mask canvas
+    if (el.btnInpaintUndo && el.inpaintMaskCanvas) {
+      el.btnInpaintUndo.addEventListener('click', () => {
+        if (state.inpaint.history.length > 0) {
+          const prev = state.inpaint.history.pop();
+          const ctx = el.inpaintMaskCanvas.getContext('2d');
+          ctx.putImageData(prev, 0, 0);
+          showToast('Đã hoàn tác nét vẽ mặt nạ ✓', 'undo');
+        } else {
+          showToast('Chưa có bước vẽ nào để hoàn tác', 'info');
+        }
+      });
+    }
+
+    // Clear Mask Action
+    if (el.btnInpaintClearMask && el.inpaintMaskCanvas) {
+      el.btnInpaintClearMask.addEventListener('click', () => {
+        const ctx = el.inpaintMaskCanvas.getContext('2d');
+        state.inpaint.history.push(ctx.getImageData(0, 0, el.inpaintMaskCanvas.width, el.inpaintMaskCanvas.height));
+        ctx.clearRect(0, 0, el.inpaintMaskCanvas.width, el.inpaintMaskCanvas.height);
+        showToast('Đã xóa toàn bộ mặt nạ vẽ', 'delete_sweep');
+      });
+    }
+
+    // Interactive Mask Drawing & Erasing
     if (el.inpaintMaskCanvas) {
       let rectSnapshot = null;
 
@@ -2402,10 +2518,19 @@
         state.inpaint.lastY = pos.y;
 
         const ctx = el.inpaintMaskCanvas.getContext('2d');
+        state.inpaint.history.push(ctx.getImageData(0, 0, el.inpaintMaskCanvas.width, el.inpaintMaskCanvas.height));
+        if (state.inpaint.history.length > 10) state.inpaint.history.shift();
+
         if (state.inpaint.tool === 'brush') {
+          ctx.globalCompositeOperation = 'source-over';
           ctx.beginPath();
           ctx.arc(pos.x, pos.y, state.inpaint.brushSize / 2, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
+          ctx.fill();
+        } else if (state.inpaint.tool === 'eraser') {
+          ctx.globalCompositeOperation = 'destination-out';
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, state.inpaint.brushSize / 2, 0, Math.PI * 2);
           ctx.fill();
         } else if (state.inpaint.tool === 'rect') {
           rectSnapshot = ctx.getImageData(0, 0, el.inpaintMaskCanvas.width, el.inpaintMaskCanvas.height);
@@ -2418,10 +2543,22 @@
         const ctx = el.inpaintMaskCanvas.getContext('2d');
 
         if (state.inpaint.tool === 'brush') {
+          ctx.globalCompositeOperation = 'source-over';
           ctx.beginPath();
           ctx.moveTo(state.inpaint.lastX, state.inpaint.lastY);
           ctx.lineTo(pos.x, pos.y);
-          ctx.strokeStyle = 'rgba(239, 68, 68, 0.8)';
+          ctx.strokeStyle = 'rgba(239, 68, 68, 0.85)';
+          ctx.lineWidth = state.inpaint.brushSize;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.stroke();
+          state.inpaint.lastX = pos.x;
+          state.inpaint.lastY = pos.y;
+        } else if (state.inpaint.tool === 'eraser') {
+          ctx.globalCompositeOperation = 'destination-out';
+          ctx.beginPath();
+          ctx.moveTo(state.inpaint.lastX, state.inpaint.lastY);
+          ctx.lineTo(pos.x, pos.y);
           ctx.lineWidth = state.inpaint.brushSize;
           ctx.lineCap = 'round';
           ctx.lineJoin = 'round';
@@ -2429,12 +2566,13 @@
           state.inpaint.lastX = pos.x;
           state.inpaint.lastY = pos.y;
         } else if (state.inpaint.tool === 'rect' && rectSnapshot) {
+          ctx.globalCompositeOperation = 'source-over';
           ctx.putImageData(rectSnapshot, 0, 0);
           const rx = Math.min(state.inpaint.startX, pos.x);
           const ry = Math.min(state.inpaint.startY, pos.y);
           const rw = Math.abs(pos.x - state.inpaint.startX);
           const rh = Math.abs(pos.y - state.inpaint.startY);
-          ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
           ctx.fillRect(rx, ry, rw, rh);
         }
       });
@@ -2447,7 +2585,175 @@
       el.inpaintMaskCanvas.addEventListener('mouseleave', stopDrawing);
     }
 
-    // Inpaint Execution Algorithm (Telea-style Neighbor Diffusion)
+    // Compare Before/After on Press & Hold
+    if (el.btnInpaintCompare && el.inpaintBaseCanvas) {
+      const bCanvas = el.inpaintBaseCanvas;
+      const bctx = bCanvas.getContext('2d');
+      let currentViewSnapshot = null;
+
+      const showOrig = (e) => {
+        if (e) e.preventDefault();
+        if (!state.inpaint.originalSnapshot) return;
+        currentViewSnapshot = bctx.getImageData(0, 0, bCanvas.width, bCanvas.height);
+        bctx.putImageData(state.inpaint.originalSnapshot, 0, 0);
+      };
+      const restoreCleaned = (e) => {
+        if (e) e.preventDefault();
+        if (currentViewSnapshot) {
+          bctx.putImageData(currentViewSnapshot, 0, 0);
+        }
+      };
+
+      el.btnInpaintCompare.addEventListener('mousedown', showOrig);
+      el.btnInpaintCompare.addEventListener('mouseup', restoreCleaned);
+      el.btnInpaintCompare.addEventListener('mouseleave', restoreCleaned);
+      el.btnInpaintCompare.addEventListener('touchstart', showOrig);
+      el.btnInpaintCompare.addEventListener('touchend', restoreCleaned);
+    }
+
+    // ─── HIGH-PRECISION INPAINTING ALGORITHM ─────────────────────────────────
+    function runInpaintingOnImageData(imgData, maskArray, w, h, dilatePixels = 2, passes = 36) {
+      const data = imgData.data;
+      let workMask = new Uint8Array(maskArray);
+
+      // Mask dilation to completely eliminate boundary fringes
+      if (dilatePixels > 0) {
+        const dMask = new Uint8Array(workMask);
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            if (workMask[y * w + x] === 1) {
+              for (let dy = -dilatePixels; dy <= dilatePixels; dy++) {
+                for (let dx = -dilatePixels; dx <= dilatePixels; dx++) {
+                  const ny = y + dy;
+                  const nx = x + dx;
+                  if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+                    dMask[ny * w + nx] = 1;
+                  }
+                }
+              }
+            }
+          }
+        }
+        workMask = dMask;
+      }
+
+      // Multi-pass weighted boundary diffusion
+      for (let pass = 0; pass < passes; pass++) {
+        for (let y = 1; y < h - 1; y++) {
+          for (let x = 1; x < w - 1; x++) {
+            const idx = y * w + x;
+            if (workMask[idx] === 1) {
+              let rSum = 0, gSum = 0, bSum = 0, aSum = 0, count = 0;
+              const neighbors = [
+                idx - w - 1, idx - w, idx - w + 1,
+                idx - 1,             idx + 1,
+                idx + w - 1, idx + w, idx + w + 1
+              ];
+              for (let k = 0; k < neighbors.length; k++) {
+                const nIdx = neighbors[k];
+                if (workMask[nIdx] === 0 || pass > 3) {
+                  const p = nIdx * 4;
+                  rSum += data[p];
+                  gSum += data[p + 1];
+                  bSum += data[p + 2];
+                  aSum += data[p + 3];
+                  count++;
+                }
+              }
+              if (count > 0) {
+                const p = idx * 4;
+                data[p] = Math.round(rSum / count);
+                data[p + 1] = Math.round(gSum / count);
+                data[p + 2] = Math.round(bSum / count);
+                data[p + 3] = Math.round(aSum / count);
+                if (pass >= 18) workMask[idx] = 0;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // High-Resolution Native Inpainting preserving 100% original sharpness
+    function inpaintFullResolutionItem(item, previewMaskCanvas, dilatePixels = 2) {
+      const pw = previewMaskCanvas.width;
+      const ph = previewMaskCanvas.height;
+      const pctx = previewMaskCanvas.getContext('2d');
+      const pMaskData = pctx.getImageData(0, 0, pw, ph).data;
+
+      // Find bounding box
+      let minX = pw, minY = ph, maxX = -1, maxY = -1;
+      let hasMask = false;
+      for (let y = 0; y < ph; y++) {
+        for (let x = 0; x < pw; x++) {
+          const i = (y * pw + x) * 4;
+          if (pMaskData[i] > 70 && pMaskData[i + 3] > 30) {
+            hasMask = true;
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (!hasMask) return null;
+
+      const fullW = item.origW;
+      const fullH = item.origH;
+      const scaleX = fullW / pw;
+      const scaleY = fullH / ph;
+
+      const pad = 16;
+      const origBoxX = Math.max(0, Math.floor((minX - pad) * scaleX));
+      const origBoxY = Math.max(0, Math.floor((minY - pad) * scaleY));
+      const origBoxX2 = Math.min(fullW, Math.ceil((maxX + pad + 1) * scaleX));
+      const origBoxY2 = Math.min(fullH, Math.ceil((maxY + pad + 1) * scaleY));
+      const boxW = origBoxX2 - origBoxX;
+      const boxH = origBoxY2 - origBoxY;
+
+      // Patch canvas at native resolution
+      const patchCanvas = document.createElement('canvas');
+      patchCanvas.width = boxW;
+      patchCanvas.height = boxH;
+      const patchCtx = patchCanvas.getContext('2d');
+      patchCtx.drawImage(item.img, origBoxX, origBoxY, boxW, boxH, 0, 0, boxW, boxH);
+
+      // Patch mask canvas
+      const patchMaskCanvas = document.createElement('canvas');
+      patchMaskCanvas.width = boxW;
+      patchMaskCanvas.height = boxH;
+      const pmCtx = patchMaskCanvas.getContext('2d');
+      pmCtx.drawImage(
+        previewMaskCanvas,
+        origBoxX / scaleX, origBoxY / scaleY, boxW / scaleX, boxH / scaleY,
+        0, 0, boxW, boxH
+      );
+
+      const patchImgData = patchCtx.getImageData(0, 0, boxW, boxH);
+      const pmData = pmCtx.getImageData(0, 0, boxW, boxH).data;
+      const patchMask = new Uint8Array(boxW * boxH);
+      for (let i = 0; i < boxW * boxH; i++) {
+        if (pmData[i * 4] > 60 && pmData[i * 4 + 3] > 20) {
+          patchMask[i] = 1;
+        }
+      }
+
+      const scaledDilate = Math.max(1, Math.round(dilatePixels * ((scaleX + scaleY) / 2)));
+      runInpaintingOnImageData(patchImgData, patchMask, boxW, boxH, scaledDilate, 40);
+      patchCtx.putImageData(patchImgData, 0, 0);
+
+      // Merge cleaned patch back into full resolution canvas
+      const fullCanvas = document.createElement('canvas');
+      fullCanvas.width = fullW;
+      fullCanvas.height = fullH;
+      const fctx = fullCanvas.getContext('2d');
+      fctx.drawImage(item.img, 0, 0);
+      fctx.drawImage(patchCanvas, origBoxX, origBoxY);
+
+      return fullCanvas;
+    }
+
+    // Execute Preview Inpaint
     if (el.btnExecuteInpaint) {
       el.btnExecuteInpaint.addEventListener('click', () => {
         if (!el.inpaintBaseCanvas || !el.inpaintMaskCanvas) return;
@@ -2460,67 +2766,39 @@
 
         const baseImg = bctx.getImageData(0, 0, w, h);
         const maskImg = mctx.getImageData(0, 0, w, h);
-        const bData = baseImg.data;
         const mData = maskImg.data;
 
-        // Find masked pixels (where red > 100 && alpha > 30)
         const mask = new Uint8Array(w * h);
         let maskedCount = 0;
         for (let i = 0; i < w * h; i++) {
-          if (mData[i * 4] > 100 && mData[i * 4 + 3] > 30) {
+          if (mData[i * 4] > 70 && mData[i * 4 + 3] > 30) {
             mask[i] = 1;
             maskedCount++;
           }
         }
 
         if (maskedCount === 0) {
-          showToast('Vui lòng vẽ vùng mặt nạ đỏ lên đối tượng cần xóa trước!', 'brush');
+          showToast('Vui lòng quét cọ hoặc chọn góc có logo cần xóa!', 'brush');
           return;
         }
 
-        showToast('Đang xóa đối tượng và phục hồi bề mặt...', 'hourglass_top');
+        // Save last applied mask canvas snapshot so apply button can use it
+        const copyMaskCanvas = document.createElement('canvas');
+        copyMaskCanvas.width = w; copyMaskCanvas.height = h;
+        copyMaskCanvas.getContext('2d').drawImage(mCanvas, 0, 0);
+        state.inpaint.lastAppliedMaskCanvas = copyMaskCanvas;
 
-        // Multi-pass boundary diffusion
-        const passes = 24;
-        for (let pass = 0; pass < passes; pass++) {
-          for (let y = 1; y < h - 1; y++) {
-            for (let x = 1; x < w - 1; x++) {
-              const idx = y * w + x;
-              if (mask[idx] === 1) {
-                let rSum = 0, gSum = 0, bSum = 0, count = 0;
-                const neighbors = [
-                  idx - w - 1, idx - w, idx - w + 1,
-                  idx - 1,             idx + 1,
-                  idx + w - 1, idx + w, idx + w + 1
-                ];
-                for (let k = 0; k < neighbors.length; k++) {
-                  const nIdx = neighbors[k];
-                  if (mask[nIdx] === 0 || pass > 4) {
-                    const p = nIdx * 4;
-                    rSum += bData[p];
-                    gSum += bData[p + 1];
-                    bSum += bData[p + 2];
-                    count++;
-                  }
-                }
-                if (count > 0) {
-                  const p = idx * 4;
-                  bData[p] = Math.round(rSum / count);
-                  bData[p + 1] = Math.round(gSum / count);
-                  bData[p + 2] = Math.round(bSum / count);
-                  if (pass >= 12) mask[idx] = 0;
-                }
-              }
-            }
-          }
-        }
+        showToast('Đang xóa logo và tái tạo nền...', 'hourglass_top');
 
+        runInpaintingOnImageData(baseImg, mask, w, h, state.inpaint.dilate || 2, 36);
         bctx.putImageData(baseImg, 0, 0);
+        state.inpaint.currentCleanedSnapshot = bctx.getImageData(0, 0, w, h);
         mctx.clearRect(0, 0, w, h);
-        showToast('✦ Thuật toán Inpainting Telea đã xóa đối tượng thành công!', 'auto_fix_high');
+        showToast('✦ Đã xóa logo sạch sẽ! Bấm "Lưu vào Canvas chính" để áp dụng', 'auto_fix_high');
       });
     }
 
+    // Apply to current image preserving 100% full-resolution
     if (el.btnInpaintApplyAndClose) {
       el.btnInpaintApplyAndClose.addEventListener('click', () => {
         if (state.activeIndex < 0 || !state.files[state.activeIndex]) {
@@ -2528,24 +2806,68 @@
           return;
         }
         const item = state.files[state.activeIndex];
-        const bCanvas = el.inpaintBaseCanvas;
+        const mCanvas = state.inpaint.lastAppliedMaskCanvas || el.inpaintMaskCanvas;
 
-        const origCanvas = document.createElement('canvas');
-        origCanvas.width = item.origW;
-        origCanvas.height = item.origH;
-        const octx = origCanvas.getContext('2d');
-        octx.drawImage(bCanvas, 0, 0, item.origW, item.origH);
+        const fullCanvas = inpaintFullResolutionItem(item, mCanvas, state.inpaint.dilate || 2);
+
+        if (!fullCanvas) {
+          // If no mask, user might just want to keep preview or close
+          closeModal('modalInpaint');
+          return;
+        }
 
         const newImg = new Image();
         newImg.onload = () => {
           item.img = newImg;
           renderArtwork();
           updateHistogram();
-          recordHistory('Xóa vật thể AI Inpainting');
+          recordHistory('Xóa Logo Hiện (Inpaint)');
           closeModal('modalInpaint');
-          showToast('✦ Đã lưu và áp dụng kết quả xóa vật thể vào ảnh!', 'check_circle');
+          showToast(`✦ Đã lưu ảnh sạch logo vào Studio (${item.origW}×${item.origH} px)!`, 'check_circle');
         };
-        newImg.src = origCanvas.toDataURL('image/png');
+        newImg.src = fullCanvas.toDataURL('image/png');
+      });
+    }
+
+    // Batch watermark removal across all loaded files
+    if (el.btnInpaintApplyAll) {
+      el.btnInpaintApplyAll.addEventListener('click', () => {
+        if (!state.files || state.files.length === 0) {
+          showToast('Chưa có ảnh nào được nạp vào Studio', 'info');
+          return;
+        }
+        const mCanvas = state.inpaint.lastAppliedMaskCanvas || el.inpaintMaskCanvas;
+        if (!mCanvas) {
+          showToast('Vui lòng khoanh vùng logo trước khi áp dụng hàng loạt!', 'warning');
+          return;
+        }
+
+        const proceed = confirm(`Bạn có chắc muốn tự động xóa logo tại vùng này trên TOÀN BỘ ${state.files.length} ảnh đang mở?`);
+        if (!proceed) return;
+
+        showToast(`Đang xóa logo hàng loạt trên ${state.files.length} ảnh...`, 'hourglass_top');
+
+        let processed = 0;
+        state.files.forEach((fileItem) => {
+          const resCanvas = inpaintFullResolutionItem(fileItem, mCanvas, state.inpaint.dilate || 2);
+          if (resCanvas) {
+            const nextImg = new Image();
+            nextImg.onload = () => {
+              fileItem.img = nextImg;
+              processed++;
+              if (processed === state.files.length) {
+                renderArtwork();
+                updateHistogram();
+                recordHistory('Xóa logo hàng loạt');
+                closeModal('modalInpaint');
+                showToast(`✓ Đã xóa logo thành công trên toàn bộ ${processed} ảnh!`, 'check_circle');
+              }
+            };
+            nextImg.src = resCanvas.toDataURL('image/png');
+          } else {
+            processed++;
+          }
+        });
       });
     }
 
@@ -2936,8 +3258,8 @@
       const orig = state.files[state.activeIndex].img;
       const bCanvas = el.inpaintBaseCanvas;
       const mCanvas = el.inpaintMaskCanvas;
-      const maxW = 640;
-      const maxH = 380;
+      const maxW = 760;
+      const maxH = 460;
       const origW = orig.naturalWidth || orig.width || 640;
       const origH = orig.naturalHeight || orig.height || 360;
       const scale = Math.min(maxW / origW, maxH / origH, 1.0);
@@ -2954,6 +3276,16 @@
 
       const mctx = mCanvas.getContext('2d');
       mctx.clearRect(0, 0, displayW, displayH);
+
+      state.inpaint.scale = scale;
+      state.inpaint.origW = origW;
+      state.inpaint.origH = origH;
+      state.inpaint.displayW = displayW;
+      state.inpaint.displayH = displayH;
+      state.inpaint.history = [];
+      state.inpaint.originalSnapshot = bctx.getImageData(0, 0, displayW, displayH);
+      state.inpaint.currentCleanedSnapshot = null;
+      state.inpaint.lastAppliedMaskCanvas = null;
     }
   }
 

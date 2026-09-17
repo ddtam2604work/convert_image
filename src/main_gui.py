@@ -919,7 +919,7 @@ class OmniImageStudioApp(ctk.CTk):
         # Row 3: Logo Eraser Buttons (Visible inpainting + Hidden LSB sanitization)
         self.btn_erase_visible = ctk.CTkButton(
             card,
-            text="🪄  Xóa Vật Thể", height=30, corner_radius=6,
+            text="🎨  Xóa Logo Hiện", height=30, corner_radius=6,
             fg_color=("#FEF3C7", "#2D261E"),
             hover_color=("#FDE68A", "#3D3428"),
             font=ctk.CTkFont("Segoe UI", 11, "bold"),
@@ -1202,6 +1202,8 @@ class OmniImageStudioApp(ctk.CTk):
     def _bind_events(self):
         self.bind("<Control-v>", lambda e: self.paste_from_clipboard())
         self.bind("<Control-o>", lambda e: self.select_files())
+        self.bind("<Control-j>", lambda e: self.open_watermark_eraser_studio())
+        self.bind("<Control-J>", lambda e: self.open_watermark_eraser_studio())
         self.bind("<Left>", lambda e: self._prev_image())
         self.bind("<Right>", lambda e: self._next_image())
 
@@ -2728,9 +2730,11 @@ class OmniImageStudioApp(ctk.CTk):
             "history": [],        # list of mask copies
             "working_img": orig_img.copy(),
             "prev_working_img": None,
+            "last_applied_mask": None,
             "tool": "brush",      # 'brush', 'rect', 'eraser'
             "brush_size": 24,
             "inpaint_rad": 4,
+            "dilate": 2,
             "method": "telea",
             "scale": 1.0,
             "ox": 0,
@@ -2835,7 +2839,7 @@ class OmniImageStudioApp(ctk.CTk):
 
         # Action Buttons (Undo / Clear)
         row_actions = ctk.CTkFrame(card_tools, fg_color="transparent")
-        row_actions.grid(row=3, column=0, padx=8, pady=(0, 8), sticky="ew")
+        row_actions.grid(row=3, column=0, padx=8, pady=(0, 6), sticky="ew")
         row_actions.grid_columnconfigure(0, weight=1)
         row_actions.grid_columnconfigure(1, weight=1)
 
@@ -2871,6 +2875,79 @@ class OmniImageStudioApp(ctk.CTk):
             text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
             command=do_clear_mask
         ).grid(row=0, column=1, padx=(4, 0), sticky="ew")
+
+        # Preset Corner Watermarks
+        preset_hdr = ctk.CTkFrame(card_tools, fg_color="transparent")
+        preset_hdr.grid(row=4, column=0, padx=8, pady=(4, 2), sticky="ew")
+        preset_hdr.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            preset_hdr, text="Vị trí logo thường gặp (1-Chạm):",
+            font=ctk.CTkFont("Segoe UI", 10, "bold"),
+            text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
+        ).grid(row=0, column=0, sticky="w")
+
+        preset_row1 = ctk.CTkFrame(card_tools, fg_color="transparent")
+        preset_row1.grid(row=5, column=0, padx=6, pady=(0, 2), sticky="ew")
+        preset_row1.grid_columnconfigure((0, 1), weight=1)
+
+        def apply_corner_preset(corner_key):
+            state["history"].append(state["mask"].copy())
+            new_m = NativeImageEngine.create_corner_watermark_mask(orig_w, orig_h, corner=corner_key)
+            from PIL import ImageChops
+            state["mask"] = ImageChops.lighter(state["mask"], new_m)
+            render_canvas()
+            names = {
+                "bottom_right": "Góc dưới phải (TikTok/CapCut)",
+                "bottom_left": "Góc dưới trái (Camera stamp)",
+                "top_right": "Góc trên phải (Logo kênh)",
+                "top_left": "Góc trên trái (Logo app)",
+                "bottom_bar": "Dải chữ nhật đáy"
+            }
+            lbl_status.configure(text=f"Đã chọn vùng: {names.get(corner_key, corner_key)} ✓", text_color=ACCENT)
+
+        ctk.CTkButton(
+            preset_row1, text="↘ Dưới Phải", height=24, corner_radius=5,
+            font=ctk.CTkFont("Segoe UI", 10),
+            fg_color=(BG_SUB_LIGHT, BG_SUB_DARK), hover_color=(BORDER_LIGHT, BORDER_DARK),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
+            command=lambda: apply_corner_preset("bottom_right")
+        ).grid(row=0, column=0, padx=2, pady=2, sticky="ew")
+
+        ctk.CTkButton(
+            preset_row1, text="↙ Dưới Trái", height=24, corner_radius=5,
+            font=ctk.CTkFont("Segoe UI", 10),
+            fg_color=(BG_SUB_LIGHT, BG_SUB_DARK), hover_color=(BORDER_LIGHT, BORDER_DARK),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
+            command=lambda: apply_corner_preset("bottom_left")
+        ).grid(row=0, column=1, padx=2, pady=2, sticky="ew")
+
+        preset_row2 = ctk.CTkFrame(card_tools, fg_color="transparent")
+        preset_row2.grid(row=6, column=0, padx=6, pady=(0, 6), sticky="ew")
+        preset_row2.grid_columnconfigure((0, 1, 2), weight=1)
+
+        ctk.CTkButton(
+            preset_row2, text="↗ Trên Phải", height=24, corner_radius=5,
+            font=ctk.CTkFont("Segoe UI", 10),
+            fg_color=(BG_SUB_LIGHT, BG_SUB_DARK), hover_color=(BORDER_LIGHT, BORDER_DARK),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
+            command=lambda: apply_corner_preset("top_right")
+        ).grid(row=0, column=0, padx=2, pady=2, sticky="ew")
+
+        ctk.CTkButton(
+            preset_row2, text="↖ Trên Trái", height=24, corner_radius=5,
+            font=ctk.CTkFont("Segoe UI", 10),
+            fg_color=(BG_SUB_LIGHT, BG_SUB_DARK), hover_color=(BORDER_LIGHT, BORDER_DARK),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
+            command=lambda: apply_corner_preset("top_left")
+        ).grid(row=0, column=1, padx=2, pady=2, sticky="ew")
+
+        ctk.CTkButton(
+            preset_row2, text="━ Dải Đáy", height=24, corner_radius=5,
+            font=ctk.CTkFont("Segoe UI", 10),
+            fg_color=(BG_SUB_LIGHT, BG_SUB_DARK), hover_color=(BORDER_LIGHT, BORDER_DARK),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
+            command=lambda: apply_corner_preset("bottom_bar")
+        ).grid(row=0, column=2, padx=2, pady=2, sticky="ew")
 
         # Section 2: Algorithm Settings
         SectionHeader(panel, "⚙", "THUẬT TOÁN TÁI TẠO").grid(row=2, column=0, padx=6, pady=(4, 6), sticky="ew")
@@ -2925,6 +3002,38 @@ class OmniImageStudioApp(ctk.CTk):
         slider_rad.set(state["inpaint_rad"])
         slider_rad.grid(row=2, column=0, padx=10, pady=(2, 6), sticky="ew")
 
+        # Mask Dilation Slider
+        dilate_hdr = ctk.CTkFrame(card_algo, fg_color="transparent")
+        dilate_hdr.grid(row=3, column=0, padx=10, pady=(2, 0), sticky="ew")
+        dilate_hdr.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            dilate_hdr, text="Bù mở rộng viền (Dilation):",
+            font=ctk.CTkFont("Segoe UI", 11),
+            text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
+        ).grid(row=0, column=0, sticky="w")
+
+        lbl_dilate = ctk.CTkLabel(
+            dilate_hdr, text=f"{state['dilate']} px",
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            text_color=ACCENT
+        )
+        lbl_dilate.grid(row=0, column=1, sticky="e")
+
+        def on_dilate_slider(val):
+            d = int(val)
+            state["dilate"] = d
+            lbl_dilate.configure(text=f"{d} px")
+
+        slider_dilate = ctk.CTkSlider(
+            card_algo, from_=0, to=8, number_of_steps=8,
+            button_color=ACCENT, button_hover_color=ACCENT_HOVER,
+            progress_color=ACCENT,
+            command=on_dilate_slider
+        )
+        slider_dilate.set(state["dilate"])
+        slider_dilate.grid(row=4, column=0, padx=10, pady=(2, 6), sticky="ew")
+
         # Also Clean Hidden LSB Watermark Checkbox
         var_also_clean_lsb = ctk.BooleanVar(value=True)
         chk_also_lsb = ctk.CTkCheckBox(
@@ -2935,7 +3044,7 @@ class OmniImageStudioApp(ctk.CTk):
             checkmark_color="white",
             fg_color=SUCCESS, hover_color=SUCCESS_HOVER,
         )
-        chk_also_lsb.grid(row=3, column=0, padx=10, pady=(4, 8), sticky="w")
+        chk_also_lsb.grid(row=5, column=0, padx=10, pady=(4, 8), sticky="w")
 
         # Section 3: Execute Erasure
         SectionHeader(panel, "⚡", "THỰC THI").grid(row=4, column=0, padx=6, pady=(4, 6), sticky="ew")
@@ -2967,11 +3076,13 @@ class OmniImageStudioApp(ctk.CTk):
             t0 = time.time()
             try:
                 # 1. Inpaint visible watermark
+                state["last_applied_mask"] = state["mask"].copy()
                 inpainted = NativeImageEngine.inpaint_watermark(
                     state["working_img"],
                     state["mask"],
                     inpaint_radius=state["inpaint_rad"],
-                    method=state["method"]
+                    method=state["method"],
+                    dilate_pixels=state.get("dilate", 2)
                 )
 
                 # 2. Optionally sanitize hidden stego as requested
@@ -2996,7 +3107,7 @@ class OmniImageStudioApp(ctk.CTk):
 
         btn_run_inpaint = ctk.CTkButton(
             card_exec,
-            text="⚡   XÓA VẬT THỂ NGAY",
+            text="⚡   XÓA LOGO HIỆN NGAY",
             height=40, corner_radius=8,
             font=ctk.CTkFont("Segoe UI", 12, "bold"),
             fg_color=WARNING, hover_color=WARNING_HOVER,
@@ -3059,6 +3170,67 @@ class OmniImageStudioApp(ctk.CTk):
         )
         btn_apply.grid(row=0, column=0, padx=8, pady=(8, 4), sticky="ew")
 
+        def apply_to_all_loaded_files():
+            if not self.loaded_files:
+                return
+            ref_mask = state["mask"]
+            if not np.any(np.array(ref_mask) > 0) and state.get("last_applied_mask"):
+                ref_mask = state["last_applied_mask"]
+
+            if not np.any(np.array(ref_mask) > 0):
+                messagebox.showwarning("Thông Báo", "Vui lòng chọn vùng logo cần xóa hoặc tẩy thử trước khi áp dụng cho tất cả ảnh!")
+                return
+
+            if not messagebox.askyesno(
+                "Xác Nhận Xử Lý Hàng Loạt",
+                f"Bạn có chắc muốn tự động xóa logo tại vị trí này trên toàn bộ {len(self.loaded_files)} ảnh đang nạp?"
+            ):
+                return
+
+            lbl_status.configure(text=f"⏳ Đang xóa logo trên {len(self.loaded_files)} ảnh...", text_color=WARNING)
+            dialog.update_idletasks()
+
+            success_cnt = 0
+            for itm in self.loaded_files:
+                try:
+                    img = itm["img"]
+                    m_scaled = ref_mask
+                    if m_scaled.size != img.size:
+                        m_scaled = ref_mask.resize(img.size, Image.Resampling.NEAREST)
+                    cleaned = NativeImageEngine.inpaint_watermark(
+                        img, m_scaled,
+                        inpaint_radius=state["inpaint_rad"],
+                        method=state["method"],
+                        dilate_pixels=state.get("dilate", 2)
+                    )
+                    if var_also_clean_lsb.get():
+                        cleaned = NativeImageEngine.sanitize_hidden_watermark(cleaned)
+                    itm["img"] = cleaned
+                    success_cnt += 1
+                except Exception as ex:
+                    print(f"Error inpainting {itm['name']}: {ex}")
+
+            self._preview_cache.clear()
+            self.update_live_preview()
+            self._set_status(f"Đã xóa logo thành công trên {success_cnt}/{len(self.loaded_files)} ảnh ✓", SUCCESS)
+            messagebox.showinfo(
+                "Hoàn Tất Xóa Hàng Loạt",
+                f"✓ Đã xóa logo thành công trên {success_cnt} tệp hình ảnh trong danh sách!"
+            )
+            dialog.destroy()
+
+        btn_apply_all = ctk.CTkButton(
+            card_save,
+            text="📁   Áp Dụng Cho TẤT CẢ Ảnh Đã Nạp",
+            height=32, corner_radius=6,
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            fg_color=("#4F46E5", "#4338CA"),
+            hover_color=("#4338CA", "#3730A3"),
+            text_color="white",
+            command=apply_to_all_loaded_files
+        )
+        btn_apply_all.grid(row=1, column=0, padx=8, pady=(0, 4), sticky="ew")
+
         def save_as_new_file():
             base_name, _ = os.path.splitext(item["name"])
             out_path = filedialog.asksaveasfilename(
@@ -3097,7 +3269,7 @@ class OmniImageStudioApp(ctk.CTk):
             text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
             command=save_as_new_file
         )
-        btn_save_file.grid(row=1, column=0, padx=8, pady=(0, 8), sticky="ew")
+        btn_save_file.grid(row=2, column=0, padx=8, pady=(0, 8), sticky="ew")
 
         # ── Canvas Rendering Engine ──
         def render_canvas(show_original=False):

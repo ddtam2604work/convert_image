@@ -30,10 +30,16 @@ Bộ công cụ xử lý, chuyển đổi định dạng và tách nền ảnh c
 - Cung cấp sẵn kích thước chuẩn cho mạng xã hội: Facebook Cover, Post, Instagram Vuông 1:1, Story 9:16, Twitter/X, YouTube Thumbnail/Banner, TikTok...
 - Hỗ trợ khóa tỉ lệ khung hình (Lock Aspect Ratio) và 3 chế độ fit: *Kéo dãn (stretch)*, *Vừa khung (contain)*, *Lấp đầy (cover)*.
 
-### 4. 🛡 Thủy Vân Bản Quyền & Xóa Logo (LSB Steganography)
-- Nhúng logo ẩn bảo vệ bản quyền không làm biến dạng hình ảnh (chống xóa, trích xuất chính xác 100%).
-- Bộ lọc quét và soi logo ẩn trong ảnh.
-- Xóa logo hiện bằng thuật toán OpenCV inpainting.
+### 4. 🛡 Thủy Vân Bản Quyền & Xóa Logo Hiện (LSB Steganography & AI Inpainting)
+- **Xóa Logo Hiện 1-Chạm (Visible Watermark Eraser)**:
+  - Tích hợp presets chọn nhanh 4 góc phổ biến: **Góc dưới phải** (TikTok, CapCut), **Góc dưới trái** (dấu camera smartphone "Shot on..."), **Góc trên phải** (logo truyền hình), **Góc trên trái** (app logo), **Dải chữ nhật đáy** (phụ đề / banner).
+  - Thuật toán tái tạo bề mặt tự nhiên (Telea FMM / Navier-Stokes) với tùy chọn bù mở rộng viền (Mask Dilation) loại bỏ hoàn toàn viền lem mờ.
+  - Hỗ trợ **áp dụng xóa logo cho toàn bộ danh sách ảnh hàng loạt (Batch Watermark Removal)**.
+  - Bảo toàn 100% độ phân giải gốc của ảnh (High-Res Native Inpainting) — chỉ tái tạo vùng bị che, giữ nguyên độ nét từng pixel ở các vùng khác.
+- **Thủy vân ẩn bảo vệ bản quyền (LSB Steganography)**:
+  - Nhúng logo ẩn bảo vệ bản quyền không làm biến dạng hình ảnh (chống xóa, trích xuất chính xác 100%).
+  - Bộ lọc quét, soi và trích xuất logo ẩn trong ảnh.
+  - Làm sạch / tẩy triệt để các watermark LSB ẩn.
 
 ---
 

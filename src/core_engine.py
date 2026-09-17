@@ -602,7 +602,61 @@ class NativeImageEngine:
         return cleaned_rgb
 
     @staticmethod
-    def inpaint_watermark(image, mask, inpaint_radius=4, method="telea"):
+    def create_corner_watermark_mask(width, height, corner="bottom_right", width_ratio=0.22, height_ratio=0.08, margin=12):
+        """
+        Create a binary mask PIL Image for common watermark positions.
+        :param width: Image width
+        :param height: Image height
+        :param corner: 'bottom_right', 'bottom_left', 'top_right', 'top_left', 'bottom_bar'
+        :param width_ratio: Box width relative to image width
+        :param height_ratio: Box height relative to image height
+        :param margin: Distance from edges in pixels
+        :return: PIL Image in mode 'L' (0 = background, 255 = watermark area)
+        """
+        mask = Image.new("L", (width, height), 0)
+        from PIL import ImageDraw
+        draw = ImageDraw.Draw(mask)
+
+        bw = max(20, int(width * width_ratio))
+        bh = max(15, int(height * height_ratio))
+        m = max(4, int(margin))
+
+        if corner == "bottom_right":
+            x0 = max(0, width - bw - m)
+            y0 = max(0, height - bh - m)
+            x1 = min(width, width - m)
+            y1 = min(height, height - m)
+        elif corner == "bottom_left":
+            x0 = m
+            y0 = max(0, height - bh - m)
+            x1 = min(width, m + bw)
+            y1 = min(height, height - m)
+        elif corner == "top_right":
+            x0 = max(0, width - bw - m)
+            y0 = m
+            x1 = min(width, width - m)
+            y1 = min(height, m + bh)
+        elif corner == "top_left":
+            x0 = m
+            y0 = m
+            x1 = min(width, m + bw)
+            y1 = min(height, m + bh)
+        elif corner == "bottom_bar":
+            x0 = m
+            y0 = max(0, height - bh - m)
+            x1 = max(width - m, x0 + 1)
+            y1 = min(height, height - m)
+        else:
+            x0 = max(0, width - bw - m)
+            y0 = max(0, height - bh - m)
+            x1 = min(width, width - m)
+            y1 = min(height, height - m)
+
+        draw.rectangle([x0, y0, x1, y1], fill=255)
+        return mask
+
+    @staticmethod
+    def inpaint_watermark(image, mask, inpaint_radius=4, method="telea", dilate_pixels=2):
         """
         Remove visible logos, watermarks, or text overlay using OpenCV inpainting.
         Only pixels marked in mask (value > 0) are modified, preserving 100% of the
@@ -612,6 +666,7 @@ class NativeImageEngine:
         :param mask: PIL Image in mode 'L' (same size as image, 255 = watermark, 0 = keep)
         :param inpaint_radius: Radius of circular neighborhood for inpainting (default: 4)
         :param method: 'telea' (Fast Marching Method) or 'ns' (Navier-Stokes fluid dynamics)
+        :param dilate_pixels: Pixels to expand the mask to eliminate boundary fringes (default: 2)
         :return: Inpainted PIL Image preserving original mode
         """
         if mask is None:
@@ -625,6 +680,12 @@ class NativeImageEngine:
         if not np.any(np_mask > 0):
             # Empty mask, nothing to inpaint
             return image
+            
+        # Morphological dilation to eliminate faint watermark edge artifacts
+        if dilate_pixels and int(dilate_pixels) > 0:
+            d_size = int(dilate_pixels) * 2 + 1
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (d_size, d_size))
+            np_mask = cv2.dilate(np_mask, kernel, iterations=1)
             
         flags = cv2.INPAINT_TELEA if method.lower() == "telea" else cv2.INPAINT_NS
         rad = max(1, int(inpaint_radius))
