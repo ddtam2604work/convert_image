@@ -290,6 +290,8 @@
     lblInpaintDilate: $('lblInpaintDilate'),
     btnInpaintClearMask: $('btnInpaintClearMask'),
     btnExecuteInpaint: $('btnExecuteInpaint'),
+    btnExecuteCrop: $('btnExecuteCrop'),
+    btnExecuteTransparent: $('btnExecuteTransparent'),
     btnInpaintApplyAll: $('btnInpaintApplyAll'),
     btnInpaintApplyAndClose: $('btnInpaintApplyAndClose'),
     btnPresetBottomRight: $('btnPresetBottomRight'),
@@ -2611,12 +2613,13 @@
       el.btnInpaintCompare.addEventListener('touchend', restoreCleaned);
     }
 
-    // ─── HIGH-PRECISION INPAINTING ALGORITHM ─────────────────────────────────
-    function runInpaintingOnImageData(imgData, maskArray, w, h, dilatePixels = 2, passes = 36) {
+    // ─── HIGH-PRECISION WATERMARK / LOGO ERASER ENGINE ───────────────────────
+    // 1. Clean Background Fill: Samples clean perimeter outside mask to eliminate dark text smear/blur
+    function runInpaintingOnImageData(imgData, maskArray, w, h, dilatePixels = 2, passes = 24) {
       const data = imgData.data;
       let workMask = new Uint8Array(maskArray);
 
-      // Mask dilation to completely eliminate boundary fringes
+      // Mask dilation to completely cover logo boundary fringes & antialiasing
       if (dilatePixels > 0) {
         const dMask = new Uint8Array(workMask);
         for (let y = 0; y < h; y++) {
@@ -2637,13 +2640,62 @@
         workMask = dMask;
       }
 
-      // Multi-pass weighted boundary diffusion
+      // Sample clean surrounding background color from perimeter ring outside mask
+      // (This PREVENTS logo text colors from diffusing or causing dark blurry smudges!)
+      let rSum = 0, gSum = 0, bSum = 0, aSum = 0, bgCount = 0;
+      const ringDist = Math.max(3, dilatePixels + 3);
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const idx = y * w + x;
+          if (workMask[idx] === 0) {
+            let nearMask = false;
+            for (let dy = -ringDist; dy <= ringDist && !nearMask; dy += 2) {
+              for (let dx = -ringDist; dx <= ringDist && !nearMask; dx += 2) {
+                const ny = y + dy;
+                const nx = x + dx;
+                if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+                  if (workMask[ny * w + nx] === 1) {
+                    nearMask = true;
+                  }
+                }
+              }
+            }
+            if (nearMask) {
+              const p = idx * 4;
+              rSum += data[p];
+              gSum += data[p + 1];
+              bSum += data[p + 2];
+              aSum += data[p + 3];
+              bgCount++;
+            }
+          }
+        }
+      }
+
+      const meanR = bgCount > 0 ? Math.round(rSum / bgCount) : 255;
+      const meanG = bgCount > 0 ? Math.round(gSum / bgCount) : 255;
+      const meanB = bgCount > 0 ? Math.round(bSum / bgCount) : 255;
+      const meanA = bgCount > 0 ? Math.round(aSum / bgCount) : 255;
+
+      // OVERWRITE all logo pixels with clean background color!
+      // This wipes out the logo completely so no dark text blur can occur.
+      for (let i = 0; i < w * h; i++) {
+        if (workMask[i] === 1) {
+          const p = i * 4;
+          data[p] = meanR;
+          data[p + 1] = meanG;
+          data[p + 2] = meanB;
+          data[p + 3] = meanA;
+        }
+      }
+
+      // Smoothly blend the boundary seam into the surrounding pixels
       for (let pass = 0; pass < passes; pass++) {
         for (let y = 1; y < h - 1; y++) {
           for (let x = 1; x < w - 1; x++) {
             const idx = y * w + x;
             if (workMask[idx] === 1) {
-              let rSum = 0, gSum = 0, bSum = 0, aSum = 0, count = 0;
+              let sR = 0, sG = 0, sB = 0, sA = 0, cnt = 0;
               const neighbors = [
                 idx - w - 1, idx - w, idx - w + 1,
                 idx - 1,             idx + 1,
@@ -2651,22 +2703,19 @@
               ];
               for (let k = 0; k < neighbors.length; k++) {
                 const nIdx = neighbors[k];
-                if (workMask[nIdx] === 0 || pass > 3) {
-                  const p = nIdx * 4;
-                  rSum += data[p];
-                  gSum += data[p + 1];
-                  bSum += data[p + 2];
-                  aSum += data[p + 3];
-                  count++;
-                }
+                const p = nIdx * 4;
+                sR += data[p];
+                sG += data[p + 1];
+                sB += data[p + 2];
+                sA += data[p + 3];
+                cnt++;
               }
-              if (count > 0) {
+              if (cnt > 0) {
                 const p = idx * 4;
-                data[p] = Math.round(rSum / count);
-                data[p + 1] = Math.round(gSum / count);
-                data[p + 2] = Math.round(bSum / count);
-                data[p + 3] = Math.round(aSum / count);
-                if (pass >= 18) workMask[idx] = 0;
+                data[p] = Math.round(sR / cnt);
+                data[p + 1] = Math.round(sG / cnt);
+                data[p + 2] = Math.round(sB / cnt);
+                data[p + 3] = Math.round(sA / cnt);
               }
             }
           }
@@ -2674,20 +2723,49 @@
       }
     }
 
-    // High-Resolution Native Inpainting preserving 100% original sharpness
-    function inpaintFullResolutionItem(item, previewMaskCanvas, dilatePixels = 2) {
-      const pw = previewMaskCanvas.width;
-      const ph = previewMaskCanvas.height;
-      const pctx = previewMaskCanvas.getContext('2d');
+    // 2. Transparent Erase: Clears alpha channel in mask region to 0
+    function runTransparentEraseOnImageData(imgData, maskArray, w, h, dilatePixels = 2) {
+      const data = imgData.data;
+      let workMask = new Uint8Array(maskArray);
+      if (dilatePixels > 0) {
+        const dMask = new Uint8Array(workMask);
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            if (workMask[y * w + x] === 1) {
+              for (let dy = -dilatePixels; dy <= dilatePixels; dy++) {
+                for (let dx = -dilatePixels; dx <= dilatePixels; dx++) {
+                  const ny = y + dy;
+                  const nx = x + dx;
+                  if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+                    dMask[ny * w + nx] = 1;
+                  }
+                }
+              }
+            }
+          }
+        }
+        workMask = dMask;
+      }
+      for (let i = 0; i < w * h; i++) {
+        if (workMask[i] === 1) {
+          data[i * 4 + 3] = 0;
+        }
+      }
+    }
+
+    // 3. Helper to find bounding box of mask in canvas
+    function getWatermarkBoundingBox(maskCanvas) {
+      const pw = maskCanvas.width;
+      const ph = maskCanvas.height;
+      const pctx = maskCanvas.getContext('2d');
       const pMaskData = pctx.getImageData(0, 0, pw, ph).data;
 
-      // Find bounding box
       let minX = pw, minY = ph, maxX = -1, maxY = -1;
       let hasMask = false;
       for (let y = 0; y < ph; y++) {
         for (let x = 0; x < pw; x++) {
           const i = (y * pw + x) * 4;
-          if (pMaskData[i] > 70 && pMaskData[i + 3] > 30) {
+          if (pMaskData[i] > 60 && pMaskData[i + 3] > 20) {
             hasMask = true;
             if (x < minX) minX = x;
             if (x > maxX) maxX = x;
@@ -2697,17 +2775,72 @@
         }
       }
       if (!hasMask) return null;
+      return { minX, minY, maxX, maxY, pw, ph };
+    }
+
+    // 4. Crop Out Watermark Region from Image
+    function cropOutWatermarkFromItem(item, maskCanvas) {
+      const box = getWatermarkBoundingBox(maskCanvas);
+      if (!box) return null;
 
       const fullW = item.origW;
       const fullH = item.origH;
-      const scaleX = fullW / pw;
-      const scaleY = fullH / ph;
+      const scaleX = fullW / box.pw;
+      const scaleY = fullH / box.ph;
 
-      const pad = 16;
-      const origBoxX = Math.max(0, Math.floor((minX - pad) * scaleX));
-      const origBoxY = Math.max(0, Math.floor((minY - pad) * scaleY));
-      const origBoxX2 = Math.min(fullW, Math.ceil((maxX + pad + 1) * scaleX));
-      const origBoxY2 = Math.min(fullH, Math.ceil((maxY + pad + 1) * scaleY));
+      const fx1 = Math.floor(box.minX * scaleX);
+      const fy1 = Math.floor(box.minY * scaleY);
+      const fx2 = Math.ceil(box.maxX * scaleX);
+      const fy2 = Math.ceil(box.maxY * scaleY);
+
+      const distBottom = fullH - fy2;
+      const distTop = fy1;
+      const distRight = fullW - fx2;
+      const distLeft = fx1;
+
+      let cropX = 0, cropY = 0, cropW = fullW, cropH = fullH;
+      if (fy1 >= fullH * 0.65 || distBottom <= Math.min(distTop, distLeft, distRight)) {
+        cropH = Math.max(10, fy1 - 2);
+      } else if (fy2 <= fullH * 0.35 || distTop <= Math.min(distBottom, distLeft, distRight)) {
+        cropY = Math.min(fullH - 10, fy2 + 2);
+        cropH = fullH - cropY;
+      } else if (fx1 >= fullW * 0.65 || distRight <= Math.min(distBottom, distTop, distLeft)) {
+        cropW = Math.max(10, fx1 - 2);
+      } else if (fx2 <= fullW * 0.35 || distLeft <= Math.min(distBottom, distTop, distRight)) {
+        cropX = Math.min(fullW - 10, fx2 + 2);
+        cropW = fullW - cropX;
+      } else {
+        cropH = Math.max(10, fy1 - 2);
+      }
+
+      const cropCanvas = document.createElement('canvas');
+      cropCanvas.width = cropW;
+      cropCanvas.height = cropH;
+      const ctx = cropCanvas.getContext('2d');
+      ctx.drawImage(item.img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+      return cropCanvas;
+    }
+
+    // High-Resolution Native Inpainting / Crop / Transparent Erasure
+    function inpaintFullResolutionItem(item, previewMaskCanvas, dilatePixels = 2, opType = 'clean_fill') {
+      if (opType === 'crop') {
+        return cropOutWatermarkFromItem(item, previewMaskCanvas);
+      }
+
+      const box = getWatermarkBoundingBox(previewMaskCanvas);
+      if (!box) return null;
+
+      const fullW = item.origW;
+      const fullH = item.origH;
+      const scaleX = fullW / box.pw;
+      const scaleY = fullH / box.ph;
+
+      const pad = 24;
+      const origBoxX = Math.max(0, Math.floor((box.minX - pad) * scaleX));
+      const origBoxY = Math.max(0, Math.floor((box.minY - pad) * scaleY));
+      const origBoxX2 = Math.min(fullW, Math.ceil((box.maxX + pad + 1) * scaleX));
+      const origBoxY2 = Math.min(fullH, Math.ceil((box.maxY + pad + 1) * scaleY));
       const boxW = origBoxX2 - origBoxX;
       const boxH = origBoxY2 - origBoxY;
 
@@ -2733,13 +2866,17 @@
       const pmData = pmCtx.getImageData(0, 0, boxW, boxH).data;
       const patchMask = new Uint8Array(boxW * boxH);
       for (let i = 0; i < boxW * boxH; i++) {
-        if (pmData[i * 4] > 60 && pmData[i * 4 + 3] > 20) {
+        if (pmData[i * 4] > 50 && pmData[i * 4 + 3] > 15) {
           patchMask[i] = 1;
         }
       }
 
       const scaledDilate = Math.max(1, Math.round(dilatePixels * ((scaleX + scaleY) / 2)));
-      runInpaintingOnImageData(patchImgData, patchMask, boxW, boxH, scaledDilate, 40);
+      if (opType === 'transparent') {
+        runTransparentEraseOnImageData(patchImgData, patchMask, boxW, boxH, scaledDilate);
+      } else {
+        runInpaintingOnImageData(patchImgData, patchMask, boxW, boxH, scaledDilate, 32);
+      }
       patchCtx.putImageData(patchImgData, 0, 0);
 
       // Merge cleaned patch back into full resolution canvas
@@ -2747,13 +2884,20 @@
       fullCanvas.width = fullW;
       fullCanvas.height = fullH;
       const fctx = fullCanvas.getContext('2d');
-      fctx.drawImage(item.img, 0, 0);
-      fctx.drawImage(patchCanvas, origBoxX, origBoxY);
+      if (opType === 'transparent') {
+        fctx.clearRect(0, 0, fullW, fullH);
+        fctx.drawImage(item.img, 0, 0);
+        fctx.clearRect(origBoxX, origBoxY, boxW, boxH);
+        fctx.drawImage(patchCanvas, origBoxX, origBoxY);
+      } else {
+        fctx.drawImage(item.img, 0, 0);
+        fctx.drawImage(patchCanvas, origBoxX, origBoxY);
+      }
 
       return fullCanvas;
     }
 
-    // Execute Preview Inpaint
+    // Execute Preview Clean Inpaint
     if (el.btnExecuteInpaint) {
       el.btnExecuteInpaint.addEventListener('click', () => {
         if (!el.inpaintBaseCanvas || !el.inpaintMaskCanvas) return;
@@ -2771,30 +2915,129 @@
         const mask = new Uint8Array(w * h);
         let maskedCount = 0;
         for (let i = 0; i < w * h; i++) {
-          if (mData[i * 4] > 70 && mData[i * 4 + 3] > 30) {
+          if (mData[i * 4] > 60 && mData[i * 4 + 3] > 20) {
             mask[i] = 1;
             maskedCount++;
           }
         }
 
         if (maskedCount === 0) {
-          showToast('Vui lòng quét cọ hoặc chọn góc có logo cần xóa!', 'brush');
+          showToast('Vui lòng quét cọ hoặc chọn vị trí có logo cần xóa!', 'brush');
           return;
         }
 
-        // Save last applied mask canvas snapshot so apply button can use it
         const copyMaskCanvas = document.createElement('canvas');
         copyMaskCanvas.width = w; copyMaskCanvas.height = h;
         copyMaskCanvas.getContext('2d').drawImage(mCanvas, 0, 0);
         state.inpaint.lastAppliedMaskCanvas = copyMaskCanvas;
+        state.inpaint.lastOp = 'clean_fill';
 
-        showToast('Đang xóa logo và tái tạo nền...', 'hourglass_top');
+        showToast('Đang xóa logo và lấp đầy nền...', 'hourglass_top');
 
-        runInpaintingOnImageData(baseImg, mask, w, h, state.inpaint.dilate || 2, 36);
+        runInpaintingOnImageData(baseImg, mask, w, h, state.inpaint.dilate || 2, 28);
         bctx.putImageData(baseImg, 0, 0);
         state.inpaint.currentCleanedSnapshot = bctx.getImageData(0, 0, w, h);
         mctx.clearRect(0, 0, w, h);
-        showToast('✦ Đã xóa logo sạch sẽ! Bấm "Lưu vào Canvas chính" để áp dụng', 'auto_fix_high');
+        showToast('✦ Đã xóa sạch logo không bị mờ! Bấm "Lưu vào Canvas" để áp dụng', 'auto_fix_high');
+      });
+    }
+
+    // Execute Crop Edge Containing Watermark
+    if (el.btnExecuteCrop) {
+      el.btnExecuteCrop.addEventListener('click', () => {
+        if (!el.inpaintBaseCanvas || !el.inpaintMaskCanvas) return;
+        const bCanvas = el.inpaintBaseCanvas;
+        const mCanvas = el.inpaintMaskCanvas;
+        const bctx = bCanvas.getContext('2d');
+
+        const box = getWatermarkBoundingBox(mCanvas);
+        if (!box) {
+          showToast('Vui lòng quét cọ hoặc chọn vị trí logo cần cắt bỏ viền!', 'crop');
+          return;
+        }
+
+        const copyMaskCanvas = document.createElement('canvas');
+        copyMaskCanvas.width = mCanvas.width; copyMaskCanvas.height = mCanvas.height;
+        copyMaskCanvas.getContext('2d').drawImage(mCanvas, 0, 0);
+        state.inpaint.lastAppliedMaskCanvas = copyMaskCanvas;
+        state.inpaint.lastOp = 'crop';
+
+        const distBottom = bCanvas.height - box.maxY;
+        const distTop = box.minY;
+        const distRight = bCanvas.width - box.maxX;
+        const distLeft = box.minX;
+
+        let cx = 0, cy = 0, cw = bCanvas.width, ch = bCanvas.height;
+        if (box.minY >= bCanvas.height * 0.65 || distBottom <= Math.min(distTop, distLeft, distRight)) {
+          ch = Math.max(10, box.minY - 2);
+        } else if (box.maxY <= bCanvas.height * 0.35 || distTop <= Math.min(distBottom, distLeft, distRight)) {
+          cy = Math.min(bCanvas.height - 10, box.maxY + 2);
+          ch = bCanvas.height - cy;
+        } else if (box.minX >= bCanvas.width * 0.65 || distRight <= Math.min(distBottom, distTop, distLeft)) {
+          cw = Math.max(10, box.minX - 2);
+        } else if (box.maxX <= bCanvas.width * 0.35 || distLeft <= Math.min(distBottom, distTop, distRight)) {
+          cx = Math.min(bCanvas.width - 10, box.maxX + 2);
+          cw = bCanvas.width - cx;
+        } else {
+          ch = Math.max(10, box.minY - 2);
+        }
+
+        const croppedPreview = document.createElement('canvas');
+        croppedPreview.width = cw;
+        croppedPreview.height = ch;
+        croppedPreview.getContext('2d').drawImage(bCanvas, cx, cy, cw, ch, 0, 0, cw, ch);
+
+        bCanvas.width = cw;
+        bCanvas.height = ch;
+        mCanvas.width = cw;
+        mCanvas.height = ch;
+        bctx.drawImage(croppedPreview, 0, 0);
+        state.inpaint.currentCleanedSnapshot = bctx.getImageData(0, 0, cw, ch);
+
+        showToast(`✂️ Đã cắt bỏ viền logo (${cw}×${ch} px)! Bấm "Lưu vào Canvas" để áp dụng`, 'crop');
+      });
+    }
+
+    // Execute Transparent Watermark Erasure
+    if (el.btnExecuteTransparent) {
+      el.btnExecuteTransparent.addEventListener('click', () => {
+        if (!el.inpaintBaseCanvas || !el.inpaintMaskCanvas) return;
+        const bCanvas = el.inpaintBaseCanvas;
+        const mCanvas = el.inpaintMaskCanvas;
+        const w = bCanvas.width;
+        const h = bCanvas.height;
+        const bctx = bCanvas.getContext('2d');
+        const mctx = mCanvas.getContext('2d');
+
+        const baseImg = bctx.getImageData(0, 0, w, h);
+        const maskImg = mctx.getImageData(0, 0, w, h);
+        const mData = maskImg.data;
+
+        const mask = new Uint8Array(w * h);
+        let maskedCount = 0;
+        for (let i = 0; i < w * h; i++) {
+          if (mData[i * 4] > 60 && mData[i * 4 + 3] > 20) {
+            mask[i] = 1;
+            maskedCount++;
+          }
+        }
+
+        if (maskedCount === 0) {
+          showToast('Vui lòng quét cọ hoặc chọn vị trí logo cần xóa trong suốt!', 'brush');
+          return;
+        }
+
+        const copyMaskCanvas = document.createElement('canvas');
+        copyMaskCanvas.width = w; copyMaskCanvas.height = h;
+        copyMaskCanvas.getContext('2d').drawImage(mCanvas, 0, 0);
+        state.inpaint.lastAppliedMaskCanvas = copyMaskCanvas;
+        state.inpaint.lastOp = 'transparent';
+
+        runTransparentEraseOnImageData(baseImg, mask, w, h, state.inpaint.dilate || 2);
+        bctx.putImageData(baseImg, 0, 0);
+        state.inpaint.currentCleanedSnapshot = bctx.getImageData(0, 0, w, h);
+        mctx.clearRect(0, 0, w, h);
+        showToast('🔲 Đã xóa logo thành trong suốt! Bấm "Lưu vào Canvas" để áp dụng', 'opacity');
       });
     }
 
@@ -2807,11 +3050,11 @@
         }
         const item = state.files[state.activeIndex];
         const mCanvas = state.inpaint.lastAppliedMaskCanvas || el.inpaintMaskCanvas;
+        const opType = state.inpaint.lastOp || 'clean_fill';
 
-        const fullCanvas = inpaintFullResolutionItem(item, mCanvas, state.inpaint.dilate || 2);
+        const fullCanvas = inpaintFullResolutionItem(item, mCanvas, state.inpaint.dilate || 2, opType);
 
         if (!fullCanvas) {
-          // If no mask, user might just want to keep preview or close
           closeModal('modalInpaint');
           return;
         }
@@ -2819,9 +3062,12 @@
         const newImg = new Image();
         newImg.onload = () => {
           item.img = newImg;
+          item.origW = fullCanvas.width;
+          item.origH = fullCanvas.height;
           renderArtwork();
           updateHistogram();
-          recordHistory('Xóa Logo Hiện (Inpaint)');
+          const opName = opType === 'crop' ? 'Cắt bỏ viền logo' : (opType === 'transparent' ? 'Xóa logo trong suốt' : 'Xóa sạch logo (Lấp nền)');
+          recordHistory(opName);
           closeModal('modalInpaint');
           showToast(`✦ Đã lưu ảnh sạch logo vào Studio (${item.origW}×${item.origH} px)!`, 'check_circle');
         };
@@ -2842,25 +3088,29 @@
           return;
         }
 
-        const proceed = confirm(`Bạn có chắc muốn tự động xóa logo tại vùng này trên TOÀN BỘ ${state.files.length} ảnh đang mở?`);
+        const opType = state.inpaint.lastOp || 'clean_fill';
+        const opDesc = opType === 'crop' ? 'cắt bỏ viền logo' : (opType === 'transparent' ? 'xóa logo trong suốt' : 'xóa sạch logo');
+        const proceed = confirm(`Bạn có chắc muốn tự động ${opDesc} tại vùng này trên TOÀN BỘ ${state.files.length} ảnh đang mở?`);
         if (!proceed) return;
 
-        showToast(`Đang xóa logo hàng loạt trên ${state.files.length} ảnh...`, 'hourglass_top');
+        showToast(`Đang ${opDesc} hàng loạt trên ${state.files.length} ảnh...`, 'hourglass_top');
 
         let processed = 0;
         state.files.forEach((fileItem) => {
-          const resCanvas = inpaintFullResolutionItem(fileItem, mCanvas, state.inpaint.dilate || 2);
+          const resCanvas = inpaintFullResolutionItem(fileItem, mCanvas, state.inpaint.dilate || 2, opType);
           if (resCanvas) {
             const nextImg = new Image();
             nextImg.onload = () => {
               fileItem.img = nextImg;
+              fileItem.origW = resCanvas.width;
+              fileItem.origH = resCanvas.height;
               processed++;
               if (processed === state.files.length) {
                 renderArtwork();
                 updateHistogram();
-                recordHistory('Xóa logo hàng loạt');
+                recordHistory(`Xử lý logo hàng loạt (${opDesc})`);
                 closeModal('modalInpaint');
-                showToast(`✓ Đã xóa logo thành công trên toàn bộ ${processed} ảnh!`, 'check_circle');
+                showToast(`✓ Đã xử lý logo thành công trên toàn bộ ${processed} ảnh!`, 'check_circle');
               }
             };
             nextImg.src = resCanvas.toDataURL('image/png');

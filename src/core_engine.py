@@ -656,17 +656,19 @@ class NativeImageEngine:
         return mask
 
     @staticmethod
-    def inpaint_watermark(image, mask, inpaint_radius=4, method="telea", dilate_pixels=2):
+    def inpaint_watermark(image, mask, inpaint_radius=4, method="telea", dilate_pixels=2, clean_fill=True):
         """
         Remove visible logos, watermarks, or text overlay using OpenCV inpainting.
-        Only pixels marked in mask (value > 0) are modified, preserving 100% of the
-        main objects outside the masked region.
+        With clean_fill=True, pre-fills the mask with the clean median background color
+        sampled from the outer boundary ring outside the mask, completely eliminating
+        dark text smudging, cloudiness, or blurring.
         
         :param image: PIL Image (RGB or RGBA)
         :param mask: PIL Image in mode 'L' (same size as image, 255 = watermark, 0 = keep)
         :param inpaint_radius: Radius of circular neighborhood for inpainting (default: 4)
         :param method: 'telea' (Fast Marching Method) or 'ns' (Navier-Stokes fluid dynamics)
         :param dilate_pixels: Pixels to expand the mask to eliminate boundary fringes (default: 2)
+        :param clean_fill: Whether to pre-fill with background color to eliminate logo blur (default: True)
         :return: Inpainted PIL Image preserving original mode
         """
         if mask is None:
@@ -687,6 +689,13 @@ class NativeImageEngine:
             kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (d_size, d_size))
             np_mask = cv2.dilate(np_mask, kernel, iterations=1)
             
+        # Compute boundary ring for clean background color sampling (prevents dark logo smudges)
+        boundary_ring = None
+        if clean_fill:
+            ring_k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+            dilated_ring = cv2.dilate(np_mask, ring_k, iterations=1)
+            boundary_ring = (dilated_ring > 0) & (np_mask == 0)
+            
         flags = cv2.INPAINT_TELEA if method.lower() == "telea" else cv2.INPAINT_NS
         rad = max(1, int(inpaint_radius))
         
@@ -697,6 +706,13 @@ class NativeImageEngine:
             bgr = cv2.cvtColor(np_rgba[:, :, :3], cv2.COLOR_RGB2BGR)
             alpha = np_rgba[:, :, 3]
             
+            # Pre-fill logo area with surrounding clean background color to avoid blur
+            if clean_fill and boundary_ring is not None and np.any(boundary_ring):
+                bg_col = np.median(bgr[boundary_ring], axis=0).astype(bgr.dtype)
+                bgr[np_mask > 0] = bg_col
+                bg_alpha = np.median(alpha[boundary_ring]).astype(alpha.dtype)
+                alpha[np_mask > 0] = bg_alpha
+                
             inp_bgr = cv2.inpaint(bgr, np_mask, rad, flags)
             inp_alpha = cv2.inpaint(alpha, np_mask, rad, flags)
             
@@ -707,9 +723,104 @@ class NativeImageEngine:
             np_rgb = np.array(image.convert("RGB"))
             bgr = cv2.cvtColor(np_rgb, cv2.COLOR_RGB2BGR)
             
+            # Pre-fill logo area with surrounding clean background color to avoid blur
+            if clean_fill and boundary_ring is not None and np.any(boundary_ring):
+                bg_col = np.median(bgr[boundary_ring], axis=0).astype(bgr.dtype)
+                bgr[np_mask > 0] = bg_col
+                
             inp_bgr = cv2.inpaint(bgr, np_mask, rad, flags)
             inp_rgb = cv2.cvtColor(inp_bgr, cv2.COLOR_BGR2RGB)
             return Image.fromarray(inp_rgb, "RGB")
+
+    @staticmethod
+    def crop_watermark_edge(image, mask, padding=0, edge=None):
+        """
+        Crop out the edge/strip containing the watermark cleanly.
+        Completely eliminates the watermark with 100% original sharpness for remaining image.
+        
+        :param image: PIL Image
+        :param mask: PIL Image in mode 'L'
+        :param padding: Extra margin to cut in pixels
+        :param edge: 'bottom', 'top', 'right', 'left', or None (auto-detect)
+        :return: Cropped PIL Image
+        """
+        if mask is None:
+            return image
+        if mask.size != image.size:
+            mask = mask.resize(image.size, Image.Resampling.NEAREST)
+            
+        bbox = mask.getbbox()
+        if not bbox:
+            return image
+            
+        min_x, min_y, max_x, max_y = bbox
+        w, h = image.size
+        
+        # Auto-detect edge if not specified
+        if edge is None:
+            dist_bottom = h - max_y
+            dist_top = min_y
+            dist_right = w - max_x
+            dist_left = min_x
+            
+            # If watermark is near bottom (e.g. bottom 35% of image or closer to bottom)
+            if min_y >= int(h * 0.65) or dist_bottom <= min(dist_top, dist_left, dist_right):
+                edge = "bottom"
+            elif max_y <= int(h * 0.35) or dist_top <= min(dist_bottom, dist_left, dist_right):
+                edge = "top"
+            elif min_x >= int(w * 0.65) or dist_right <= min(dist_bottom, dist_top, dist_left):
+                edge = "right"
+            elif max_x <= int(w * 0.35) or dist_left <= min(dist_bottom, dist_top, dist_right):
+                edge = "left"
+            else:
+                edge = "bottom"
+                
+        pad = max(0, int(padding))
+        if edge == "bottom":
+            new_h = max(10, min_y - pad)
+            return image.crop((0, 0, w, new_h))
+        elif edge == "top":
+            new_top = min(h - 10, max_y + pad)
+            return image.crop((0, new_top, w, h))
+        elif edge == "right":
+            new_w = max(10, min_x - pad)
+            return image.crop((0, 0, new_w, h))
+        elif edge == "left":
+            new_left = min(w - 10, max_x + pad)
+            return image.crop((new_left, 0, w, h))
+            
+        return image
+
+    @staticmethod
+    def erase_watermark_transparent(image, mask, dilate_pixels=2):
+        """
+        Erase masked watermark area directly into transparency (Alpha = 0).
+        Preserves 100% original colors and quality everywhere else.
+        
+        :param image: PIL Image
+        :param mask: PIL Image in mode 'L'
+        :param dilate_pixels: Mask expansion to eliminate edge fringes
+        :return: RGBA PIL Image
+        """
+        if mask is None:
+            return image.convert("RGBA")
+        if mask.size != image.size:
+            mask = mask.resize(image.size, Image.Resampling.NEAREST)
+            
+        np_mask = np.array(mask.convert("L"))
+        if not np.any(np_mask > 0):
+            return image.convert("RGBA")
+            
+        if dilate_pixels and int(dilate_pixels) > 0:
+            d_size = int(dilate_pixels) * 2 + 1
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (d_size, d_size))
+            np_mask = cv2.dilate(np_mask, kernel, iterations=1)
+            
+        rgba = image.convert("RGBA")
+        np_rgba = np.array(rgba)
+        np_rgba[np_mask > 0, 3] = 0
+        return Image.fromarray(np_rgba, "RGBA")
+
 
     @staticmethod
     def restore_degraded_image(

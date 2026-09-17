@@ -31,11 +31,14 @@ Bộ công cụ xử lý, chuyển đổi định dạng và tách nền ảnh c
 - Hỗ trợ khóa tỉ lệ khung hình (Lock Aspect Ratio) và 3 chế độ fit: *Kéo dãn (stretch)*, *Vừa khung (contain)*, *Lấp đầy (cover)*.
 
 ### 4. 🛡 Thủy Vân Bản Quyền & Xóa Logo Hiện (LSB Steganography & AI Inpainting)
-- **Xóa Logo Hiện 1-Chạm (Visible Watermark Eraser)**:
+- **Xóa & Cắt Logo Hiện (Visible Watermark Eraser & Edge Cropper)**:
+  - **3 Chế độ xử lý linh hoạt**:
+    - **✂️ Cắt bỏ viền chứa logo (Crop Out Edge)**: Tự động phát hiện và cắt xén dải viền/mép ảnh chứa watermark (dải đáy phụ đề, góc dưới TikTok/CapCut...), loại bỏ logo triệt để 100% và bảo toàn độ nét nguyên bản cho phần hình ảnh còn lại.
+    - **⚡ Xóa sạch & Lấp đầy nền (Clean Fill)**: Lấy mẫu dải viền nền bên ngoài vùng chọn để xóa sạch chữ và lấp đầy nền tự nhiên, loại bỏ hoàn toàn hiện tượng nhòe hay bóng mờ chữ đen của phương pháp inpaint thông thường.
+    - **🔲 Xóa thành trong suốt (Transparent)**: Xóa trực tiếp vùng logo thành trong suốt (Alpha = 0) cho ảnh PNG/WEBP.
   - Tích hợp presets chọn nhanh 4 góc phổ biến: **Góc dưới phải** (TikTok, CapCut), **Góc dưới trái** (dấu camera smartphone "Shot on..."), **Góc trên phải** (logo truyền hình), **Góc trên trái** (app logo), **Dải chữ nhật đáy** (phụ đề / banner).
-  - Thuật toán tái tạo bề mặt tự nhiên (Telea FMM / Navier-Stokes) với tùy chọn bù mở rộng viền (Mask Dilation) loại bỏ hoàn toàn viền lem mờ.
-  - Hỗ trợ **áp dụng xóa logo cho toàn bộ danh sách ảnh hàng loạt (Batch Watermark Removal)**.
-  - Bảo toàn 100% độ phân giải gốc của ảnh (High-Res Native Inpainting) — chỉ tái tạo vùng bị che, giữ nguyên độ nét từng pixel ở các vùng khác.
+  - Hỗ trợ **áp dụng cho toàn bộ danh sách ảnh hàng loạt (Batch Watermark Removal)**.
+  - Bảo toàn 100% độ phân giải gốc của ảnh (High-Res Native Processing) — chỉ xử lý vùng chọn, giữ nguyên độ nét từng pixel ở các vùng khác.
 - **Thủy vân ẩn bảo vệ bản quyền (LSB Steganography)**:
   - Nhúng logo ẩn bảo vệ bản quyền không làm biến dạng hình ảnh (chống xóa, trích xuất chính xác 100%).
   - Bộ lọc quét, soi và trích xuất logo ẩn trong ảnh.

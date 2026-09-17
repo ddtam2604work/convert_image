@@ -2892,7 +2892,8 @@ class OmniImageStudioApp(ctk.CTk):
 
         def apply_corner_preset(corner_key):
             state["history"].append(state["mask"].copy())
-            new_m = NativeImageEngine.create_corner_watermark_mask(orig_w, orig_h, corner=corner_key)
+            cur_w, cur_h = state["working_img"].size
+            new_m = NativeImageEngine.create_corner_watermark_mask(cur_w, cur_h, corner=corner_key)
             from PIL import ImageChops
             state["mask"] = ImageChops.lighter(state["mask"], new_m)
             render_canvas()
@@ -3062,7 +3063,7 @@ class OmniImageStudioApp(ctk.CTk):
         )
         lbl_status.grid(row=0, column=0, padx=8, pady=(8, 4))
 
-        def execute_inpaint():
+        def execute_clean_fill():
             if not np.any(np.array(state["mask"]) > 0):
                 messagebox.showwarning(
                     "Chưa Chọn Vùng Xóa",
@@ -3070,51 +3071,144 @@ class OmniImageStudioApp(ctk.CTk):
                 )
                 return
 
-            lbl_status.configure(text="⏳ Đang tính toán tái tạo vùng ảnh...", text_color=WARNING)
+            lbl_status.configure(text="⏳ Đang xóa sạch logo và lấp đầy nền...", text_color=WARNING)
             dialog.update_idletasks()
 
             t0 = time.time()
             try:
-                # 1. Inpaint visible watermark
                 state["last_applied_mask"] = state["mask"].copy()
+                state["last_op"] = "clean_fill"
                 inpainted = NativeImageEngine.inpaint_watermark(
                     state["working_img"],
                     state["mask"],
                     inpaint_radius=state["inpaint_rad"],
                     method=state["method"],
-                    dilate_pixels=state.get("dilate", 2)
+                    dilate_pixels=state.get("dilate", 2),
+                    clean_fill=True
                 )
 
-                # 2. Optionally sanitize hidden stego as requested
                 if var_also_clean_lsb.get():
                     inpainted = NativeImageEngine.sanitize_hidden_watermark(inpainted)
 
                 ms = int((time.time() - t0) * 1000)
                 state["prev_working_img"] = state["working_img"].copy()
                 state["working_img"] = inpainted
-                # Clear mask so user sees clean result
                 state["history"].append(state["mask"].copy())
-                state["mask"] = Image.new("L", (orig_w, orig_h), 0)
+                state["mask"] = Image.new("L", state["working_img"].size, 0)
 
                 render_canvas()
                 btn_compare.configure(state="normal")
-                msg = f"✅ Đã tẩy logo thành công ({ms}ms)!"
-                if var_also_clean_lsb.get():
-                    msg += " (Đã làm sạch cả LSB ẩn)"
-                lbl_status.configure(text=msg, text_color=SUCCESS)
+                lbl_status.configure(text=f"✅ Đã xóa sạch logo không mờ nhòe ({ms}ms)!", text_color=SUCCESS)
             except Exception as ex:
-                lbl_status.configure(text=f"Lỗi khi tẩy: {ex}", text_color=DANGER)
+                lbl_status.configure(text=f"Lỗi khi xóa: {ex}", text_color=DANGER)
 
-        btn_run_inpaint = ctk.CTkButton(
+        def execute_crop():
+            if not np.any(np.array(state["mask"]) > 0):
+                messagebox.showwarning(
+                    "Chưa Chọn Vùng Logo",
+                    "Vui lòng quét chọn hoặc khoanh vùng logo ở mép ảnh cần cắt bỏ!"
+                )
+                return
+
+            lbl_status.configure(text="⏳ Đang cắt bỏ viền chứa logo...", text_color=WARNING)
+            dialog.update_idletasks()
+
+            t0 = time.time()
+            try:
+                state["last_applied_mask"] = state["mask"].copy()
+                state["last_op"] = "crop"
+                cropped = NativeImageEngine.crop_watermark_edge(
+                    state["working_img"],
+                    state["mask"],
+                    padding=1
+                )
+
+                ms = int((time.time() - t0) * 1000)
+                state["prev_working_img"] = state["working_img"].copy()
+                state["working_img"] = cropped
+                state["history"].append(state["mask"].copy())
+                state["mask"] = Image.new("L", cropped.size, 0)
+
+                render_canvas()
+                btn_compare.configure(state="normal")
+                lbl_status.configure(
+                    text=f"✂️ Đã cắt viền logo thành công: {cropped.width}×{cropped.height} px ({ms}ms)!",
+                    text_color=SUCCESS
+                )
+            except Exception as ex:
+                lbl_status.configure(text=f"Lỗi khi cắt: {ex}", text_color=DANGER)
+
+        def execute_transparent():
+            if not np.any(np.array(state["mask"]) > 0):
+                messagebox.showwarning(
+                    "Chưa Chọn Vùng Xóa",
+                    "Vui lòng quét chọn vùng logo cần xóa thành trong suốt!"
+                )
+                return
+
+            lbl_status.configure(text="⏳ Đang xóa logo thành trong suốt...", text_color=WARNING)
+            dialog.update_idletasks()
+
+            t0 = time.time()
+            try:
+                state["last_applied_mask"] = state["mask"].copy()
+                state["last_op"] = "transparent"
+                trans = NativeImageEngine.erase_watermark_transparent(
+                    state["working_img"],
+                    state["mask"],
+                    dilate_pixels=state.get("dilate", 2)
+                )
+
+                ms = int((time.time() - t0) * 1000)
+                state["prev_working_img"] = state["working_img"].copy()
+                state["working_img"] = trans
+                state["history"].append(state["mask"].copy())
+                state["mask"] = Image.new("L", trans.size, 0)
+
+                render_canvas()
+                btn_compare.configure(state="normal")
+                lbl_status.configure(text=f"🔲 Đã xóa logo thành trong suốt ({ms}ms)!", text_color=SUCCESS)
+            except Exception as ex:
+                lbl_status.configure(text=f"Lỗi khi xóa trong suốt: {ex}", text_color=DANGER)
+
+        btn_clean_fill = ctk.CTkButton(
             card_exec,
-            text="⚡   XÓA LOGO HIỆN NGAY",
-            height=40, corner_radius=8,
+            text="⚡   XÓA SẠCH (LẤP ĐẦY NỀN)",
+            height=38, corner_radius=8,
             font=ctk.CTkFont("Segoe UI", 12, "bold"),
             fg_color=WARNING, hover_color=WARNING_HOVER,
             text_color="white",
-            command=execute_inpaint
+            command=execute_clean_fill
         )
-        btn_run_inpaint.grid(row=1, column=0, padx=8, pady=(4, 6), sticky="ew")
+        btn_clean_fill.grid(row=1, column=0, padx=8, pady=(4, 4), sticky="ew")
+
+        row_extra_ops = ctk.CTkFrame(card_exec, fg_color="transparent")
+        row_extra_ops.grid(row=2, column=0, padx=8, pady=(0, 4), sticky="ew")
+        row_extra_ops.grid_columnconfigure((0, 1), weight=1)
+
+        btn_crop = ctk.CTkButton(
+            row_extra_ops,
+            text="✂️   Cắt Bỏ Viền",
+            height=32, corner_radius=6,
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            fg_color=("#4F46E5", "#4338CA"),
+            hover_color=("#4338CA", "#3730A3"),
+            text_color="white",
+            command=execute_crop
+        )
+        btn_crop.grid(row=0, column=0, padx=(0, 3), sticky="ew")
+
+        btn_trans = ctk.CTkButton(
+            row_extra_ops,
+            text="🔲   Trong Suốt",
+            height=32, corner_radius=6,
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            fg_color=(BG_SUB_LIGHT, BG_SUB_DARK),
+            hover_color=(BORDER_LIGHT, BORDER_DARK),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
+            command=execute_transparent
+        )
+        btn_trans.grid(row=0, column=1, padx=(3, 0), sticky="ew")
 
         # Compare Before/After Button
         def on_compare_press(e):
@@ -3129,14 +3223,14 @@ class OmniImageStudioApp(ctk.CTk):
         btn_compare = ctk.CTkButton(
             card_exec,
             text="👁   Giữ chuột để xem ảnh gốc",
-            height=30, corner_radius=6,
+            height=28, corner_radius=6,
             font=ctk.CTkFont("Segoe UI", 11),
             fg_color=(BG_SUB_LIGHT, BG_SUB_DARK),
             hover_color=(BORDER_LIGHT, BORDER_DARK),
             text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
             state="disabled"
         )
-        btn_compare.grid(row=2, column=0, padx=8, pady=(0, 8), sticky="ew")
+        btn_compare.grid(row=3, column=0, padx=8, pady=(0, 8), sticky="ew")
         btn_compare.bind("<ButtonPress-1>", on_compare_press)
         btn_compare.bind("<ButtonRelease-1>", on_compare_release)
 
@@ -3178,16 +3272,19 @@ class OmniImageStudioApp(ctk.CTk):
                 ref_mask = state["last_applied_mask"]
 
             if not np.any(np.array(ref_mask) > 0):
-                messagebox.showwarning("Thông Báo", "Vui lòng chọn vùng logo cần xóa hoặc tẩy thử trước khi áp dụng cho tất cả ảnh!")
+                messagebox.showwarning("Thông Báo", "Vui lòng chọn vùng logo cần xử lý trước khi áp dụng cho tất cả ảnh!")
                 return
+
+            op_type = state.get("last_op", "clean_fill")
+            op_label = "cắt bỏ viền" if op_type == "crop" else ("xóa trong suốt" if op_type == "transparent" else "xóa sạch")
 
             if not messagebox.askyesno(
                 "Xác Nhận Xử Lý Hàng Loạt",
-                f"Bạn có chắc muốn tự động xóa logo tại vị trí này trên toàn bộ {len(self.loaded_files)} ảnh đang nạp?"
+                f"Bạn có chắc muốn tự động {op_label} logo tại vị trí này trên toàn bộ {len(self.loaded_files)} ảnh đang nạp?"
             ):
                 return
 
-            lbl_status.configure(text=f"⏳ Đang xóa logo trên {len(self.loaded_files)} ảnh...", text_color=WARNING)
+            lbl_status.configure(text=f"⏳ Đang xử lý trên {len(self.loaded_files)} ảnh...", text_color=WARNING)
             dialog.update_idletasks()
 
             success_cnt = 0
@@ -3197,25 +3294,35 @@ class OmniImageStudioApp(ctk.CTk):
                     m_scaled = ref_mask
                     if m_scaled.size != img.size:
                         m_scaled = ref_mask.resize(img.size, Image.Resampling.NEAREST)
-                    cleaned = NativeImageEngine.inpaint_watermark(
-                        img, m_scaled,
-                        inpaint_radius=state["inpaint_rad"],
-                        method=state["method"],
-                        dilate_pixels=state.get("dilate", 2)
-                    )
-                    if var_also_clean_lsb.get():
-                        cleaned = NativeImageEngine.sanitize_hidden_watermark(cleaned)
+                    
+                    if op_type == "crop":
+                        cleaned = NativeImageEngine.crop_watermark_edge(img, m_scaled, padding=1)
+                    elif op_type == "transparent":
+                        cleaned = NativeImageEngine.erase_watermark_transparent(
+                            img, m_scaled, dilate_pixels=state.get("dilate", 2)
+                        )
+                    else:
+                        cleaned = NativeImageEngine.inpaint_watermark(
+                            img, m_scaled,
+                            inpaint_radius=state["inpaint_rad"],
+                            method=state["method"],
+                            dilate_pixels=state.get("dilate", 2),
+                            clean_fill=True
+                        )
+                        if var_also_clean_lsb.get():
+                            cleaned = NativeImageEngine.sanitize_hidden_watermark(cleaned)
+
                     itm["img"] = cleaned
                     success_cnt += 1
                 except Exception as ex:
-                    print(f"Error inpainting {itm['name']}: {ex}")
+                    print(f"Error processing {itm['name']}: {ex}")
 
             self._preview_cache.clear()
             self.update_live_preview()
-            self._set_status(f"Đã xóa logo thành công trên {success_cnt}/{len(self.loaded_files)} ảnh ✓", SUCCESS)
+            self._set_status(f"Đã xử lý logo thành công trên {success_cnt}/{len(self.loaded_files)} ảnh ✓", SUCCESS)
             messagebox.showinfo(
                 "Hoàn Tất Xóa Hàng Loạt",
-                f"✓ Đã xóa logo thành công trên {success_cnt} tệp hình ảnh trong danh sách!"
+                f"✓ Đã xử lý logo thành công trên {success_cnt} tệp hình ảnh trong danh sách!"
             )
             dialog.destroy()
 
@@ -3276,9 +3383,16 @@ class OmniImageStudioApp(ctk.CTk):
             cw = max(100, canvas.winfo_width())
             ch = max(100, canvas.winfo_height())
 
-            scale = min((cw - 16) / orig_w, (ch - 16) / orig_h)
-            dw = max(1, int(orig_w * scale))
-            dh = max(1, int(orig_h * scale))
+            # Base image to show
+            if show_original or state["is_comparing"]:
+                base = orig_img
+            else:
+                base = state["working_img"]
+
+            cur_w, cur_h = base.size
+            scale = min((cw - 16) / cur_w, (ch - 16) / cur_h)
+            dw = max(1, int(cur_w * scale))
+            dh = max(1, int(cur_h * scale))
             ox = (cw - dw) // 2
             oy = (ch - dh) // 2
 
@@ -3287,12 +3401,6 @@ class OmniImageStudioApp(ctk.CTk):
             state["disp_h"] = dh
             state["ox"] = ox
             state["oy"] = oy
-
-            # Base image to show
-            if show_original or state["is_comparing"]:
-                base = orig_img
-            else:
-                base = state["working_img"]
 
             thumb_base = base.resize((dw, dh), Image.Resampling.BILINEAR)
 
@@ -3321,9 +3429,10 @@ class OmniImageStudioApp(ctk.CTk):
 
         # ── Mouse Interaction Handlers on Canvas ──
         def to_img_coords(cx, cy):
+            cur_w, cur_h = state["working_img"].size
             ix = int((cx - state["ox"]) / state["scale"])
             iy = int((cy - state["oy"]) / state["scale"])
-            return max(0, min(orig_w - 1, ix)), max(0, min(orig_h - 1, iy))
+            return max(0, min(cur_w - 1, ix)), max(0, min(cur_h - 1, iy))
 
         def on_canvas_b1_press(e):
             tool = state["tool"]
