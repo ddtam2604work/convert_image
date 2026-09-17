@@ -136,7 +136,7 @@
       <!-- Center: Navigation Pills -->
       <nav class="flex items-center bg-slate-100/80 p-1 rounded-2xl border border-slate-200/60" id="mainNavPills">
         <button type="button" class="px-4 py-1.5 rounded-xl transition-all whitespace-nowrap bg-white text-indigo-600 font-semibold shadow-xs text-sm" id="btnNavEdit">Chỉnh sửa ảnh</button>
-        <button type="button" class="px-3.5 py-1.5 rounded-xl text-amber-800 bg-amber-50 hover:bg-amber-100 hover:text-amber-900 border border-amber-200/80 transition-all font-body-sm text-sm whitespace-nowrap font-medium cursor-pointer" id="btnNavEraseLogo" title="Xóa Logo Hiện &amp; Watermark bằng AI Inpainting">🎨 Xóa Logo Hiện</button>
+        <button type="button" class="px-3.5 py-1.5 rounded-xl text-amber-800 bg-amber-50 hover:bg-amber-100 hover:text-amber-900 border border-amber-200/80 transition-all font-body-sm text-sm whitespace-nowrap font-medium cursor-pointer" id="btnNavEraseLogo" title="Cắt bỏ viền logo hiện &amp; watermark (không làm mờ)">✂️ Cắt Logo Hiện</button>
         <button type="button" class="px-3.5 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-white/60 transition-all font-body-sm text-sm whitespace-nowrap" id="btnNavGenAI">AI Tạo hình &amp; Mở rộng</button>
         <button type="button" class="px-3.5 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-white/60 transition-all font-body-sm text-sm whitespace-nowrap" id="btnNavBatch">Xử lý hàng loạt</button>
         <button type="button" class="px-3.5 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-white/60 transition-all font-body-sm text-sm whitespace-nowrap" id="btnNavLibrary">Thư viện &amp; Bộ lọc</button>
@@ -793,9 +793,9 @@
             <span>Thủy vân</span>
           </button>
           <!-- Watermark / Logo Eraser -->
-          <button class="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 font-label-xs text-xs transition-colors border border-amber-200/80 font-medium cursor-pointer active:scale-95" id="hudEraseLogo" type="button" title="Xóa logo hiện &amp; Watermark bằng AI Inpainting">
-            <span class="material-symbols-outlined text-[16px] text-amber-600">magic_button</span>
-            <span>Xóa Logo Hiện</span>
+          <button class="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 font-label-xs text-xs transition-colors border border-amber-200/80 font-medium cursor-pointer active:scale-95" id="hudEraseLogo" type="button" title="Cắt bỏ viền chứa logo &amp; watermark (không làm mờ)">
+            <span class="material-symbols-outlined text-[16px] text-amber-600">crop</span>
+            <span>Cắt Logo Hiện</span>
           </button>
         </div>
 
@@ -846,12 +846,12 @@
     <div class="studio-modal-card w-[980px] max-w-[96vw]">
       <div class="h-14 px-6 bg-slate-50 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
         <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center">
-            <span class="material-symbols-outlined text-[20px]">magic_button</span>
+          <div class="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center">
+            <span class="material-symbols-outlined text-[20px]">crop</span>
           </div>
           <div class="flex flex-col">
-            <h3 class="font-headline-sm font-semibold text-slate-900 text-sm">Studio Xóa Logo Hiện &amp; Vật Thể AI (Watermark Eraser)</h3>
-            <span class="text-[11px] text-slate-500 font-normal">Khoanh vùng logo hoặc chọn nhanh 4 góc bên dưới để AI tái tạo nền tự nhiên</span>
+            <h3 class="font-headline-sm font-semibold text-slate-900 text-sm">Studio Cắt &amp; Loại Bỏ Logo Hiện (Watermark Cropper)</h3>
+            <span class="text-[11px] text-slate-500 font-normal">Khoanh vùng logo hoặc chọn nhanh góc viền bên dưới để cắt xén dải logo, bảo toàn 100% độ nét cho ảnh (không làm mờ)</span>
           </div>
         </div>
         <button type="button" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors" data-close-modal="modalInpaint">
@@ -884,16 +884,21 @@
           <button type="button" class="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-amber-100 hover:text-amber-800 text-slate-700 transition-colors cursor-pointer" id="btnPresetBottomBar" title="Dải chữ nhật đáy / phụ đề">━ Dải đáy</button>
         </div>
 
-        <!-- Sliders: Brush Size & Dilation -->
-        <div class="flex items-center gap-4">
-          <div class="flex items-center gap-2">
-            <span class="text-xs text-slate-600 font-medium">Cỡ cọ: <span id="lblInpaintBrushSize" class="font-mono text-indigo-600 font-semibold">24px</span></span>
-            <input type="range" id="sliderInpaintBrush" min="4" max="100" value="24" class="w-24 studio-range-slider"/>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="text-xs text-slate-600 font-medium" title="Bù nở viền để xóa sạch bóng mờ chữ">Bù viền: <span id="lblInpaintDilate" class="font-mono text-amber-600 font-semibold">2px</span></span>
-            <input type="range" id="sliderInpaintDilate" min="0" max="8" value="2" class="w-20 studio-range-slider"/>
-          </div>
+        <!-- Direction Selection for Edge Crop -->
+        <div class="flex items-center gap-1 bg-white/80 p-1 rounded-xl border border-slate-200/80" id="cropEdgeSelector">
+          <span class="text-[11px] font-semibold text-slate-500 px-2">Mép cắt:</span>
+          <button type="button" class="px-2 py-1 rounded-lg text-[11px] font-medium bg-indigo-600 text-white cursor-pointer crop-edge-btn" data-edge="auto">⚡ Tự động</button>
+          <button type="button" class="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer crop-edge-btn" data-edge="bottom">━ Đáy</button>
+          <button type="button" class="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer crop-edge-btn" data-edge="right">▏ Phải</button>
+          <button type="button" class="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer crop-edge-btn" data-edge="top">━ Trên</button>
+          <button type="button" class="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer crop-edge-btn" data-edge="left">▕ Trái</button>
+        </div>
+
+        <!-- Sliders: Brush Size -->
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-slate-600 font-medium">Cỡ cọ: <span id="lblInpaintBrushSize" class="font-mono text-indigo-600 font-semibold">24px</span></span>
+          <input type="range" id="sliderInpaintBrush" min="4" max="100" value="24" class="w-20 studio-range-slider"/>
+          <input type="hidden" id="sliderInpaintDilate" value="2"/>
         </div>
       </div>
 
@@ -920,24 +925,28 @@
         </div>
 
         <div class="flex items-center gap-2 flex-wrap">
-          <button type="button" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white shadow-sm flex items-center gap-1.5 cursor-pointer transition-all active:scale-95" id="btnExecuteInpaint" title="Xóa logo sạch và lấp đầy nền không bị mờ nhòe">
-            <span class="material-symbols-outlined text-[16px]">magic_button</span>
-            <span>⚡ Xóa Sạch (Lấp Nền)</span>
+          <button type="button" class="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 ring-2 ring-indigo-300/60" id="btnExecuteCrop" title="Cắt bỏ dải viền mép chứa logo, bảo toàn 100% độ nét cho toàn bộ phần ảnh còn lại">
+            <span class="material-symbols-outlined text-[17px]">crop</span>
+            <span>✂️ CẮT BỎ LOGO (CROP)</span>
           </button>
-          <button type="button" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm flex items-center gap-1.5 cursor-pointer transition-all active:scale-95" id="btnExecuteCrop" title="Cắt bỏ viền mép chứa logo, ảnh giữ độ nét 100%">
-            <span class="material-symbols-outlined text-[16px]">crop</span>
-            <span>✂️ Cắt Bỏ Viền Logo</span>
+          <button type="button" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md flex items-center gap-1.5 cursor-pointer transition-all active:scale-95" id="btnCropAndApplyDirectly" title="Cắt bỏ dải logo và lưu ngay vào Canvas Studio">
+            <span class="material-symbols-outlined text-[17px]">done_all</span>
+            <span>✂️ Cắt &amp; Lưu Luôn</span>
           </button>
-          <button type="button" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 flex items-center gap-1.5 cursor-pointer transition-all active:scale-95" id="btnExecuteTransparent" title="Xóa sạch logo thành trong suốt">
-            <span class="material-symbols-outlined text-[16px]">opacity</span>
-            <span>🔲 Xóa Trong Suốt</span>
+          <button type="button" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 flex items-center gap-1 cursor-pointer transition-all active:scale-95" id="btnExecuteTransparent" title="Xóa logo thành trong suốt (Alpha = 0, không mờ)">
+            <span class="material-symbols-outlined text-[15px]">opacity</span>
+            <span>🔲 Trong Suốt</span>
           </button>
-          <button type="button" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 flex items-center gap-1 cursor-pointer transition-all active:scale-95" id="btnInpaintApplyAll" title="Áp dụng thao tác này cho tất cả ảnh đang có">
-            <span class="material-symbols-outlined text-[16px]">dynamic_feed</span>
-            <span>Áp dụng tất cả ảnh</span>
+          <button type="button" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 flex items-center gap-1 cursor-pointer transition-all active:scale-95" id="btnExecuteInpaint" title="Lấp đầy màu nền (không làm mờ chữ)">
+            <span class="material-symbols-outlined text-[15px]">format_color_fill</span>
+            <span>🎨 Lấp Nền</span>
           </button>
-          <button type="button" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm flex items-center gap-1 cursor-pointer transition-all active:scale-95" id="btnInpaintApplyAndClose">
-            <span class="material-symbols-outlined text-[16px]">check_circle</span>
+          <button type="button" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 flex items-center gap-1 cursor-pointer transition-all active:scale-95" id="btnInpaintApplyAll" title="Cắt bỏ dải logo này cho toàn bộ danh sách ảnh">
+            <span class="material-symbols-outlined text-[15px]">dynamic_feed</span>
+            <span>Cắt tất cả ảnh</span>
+          </button>
+          <button type="button" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-900 text-white shadow-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95" id="btnInpaintApplyAndClose">
+            <span class="material-symbols-outlined text-[15px]">check_circle</span>
             <span>Lưu vào Canvas</span>
           </button>
         </div>

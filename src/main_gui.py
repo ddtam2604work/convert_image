@@ -919,7 +919,7 @@ class OmniImageStudioApp(ctk.CTk):
         # Row 3: Logo Eraser Buttons (Visible inpainting + Hidden LSB sanitization)
         self.btn_erase_visible = ctk.CTkButton(
             card,
-            text="🎨  Xóa Logo Hiện", height=30, corner_radius=6,
+            text="✂️  Cắt Logo Hiện", height=30, corner_radius=6,
             fg_color=("#FEF3C7", "#2D261E"),
             hover_color=("#FDE68A", "#3D3428"),
             font=ctk.CTkFont("Segoe UI", 11, "bold"),
@@ -1077,7 +1077,7 @@ class OmniImageStudioApp(ctk.CTk):
         self.btn_nav_canva.pack(side="right", padx=4, pady=4)
 
         self.btn_nav_erase = ctk.CTkButton(
-            nav_bar, text="🎨  Xóa Logo Hiện", width=115, height=26, corner_radius=6,
+            nav_bar, text="✂️  Cắt Logo Hiện", width=115, height=26, corner_radius=6,
             font=ctk.CTkFont("Segoe UI", 10, "bold"),
             fg_color=WARNING, hover_color=WARNING_HOVER,
             text_color="white",
@@ -1902,7 +1902,7 @@ class OmniImageStudioApp(ctk.CTk):
 
         ctk.CTkButton(
             b_btns,
-            text="🎨   Mở Studio Xóa Logo Hiện",
+            text="✂️   Mở Studio Cắt Logo Hiện",
             height=32, corner_radius=6,
             font=ctk.CTkFont("Segoe UI", 11),
             fg_color=ACCENT, hover_color=ACCENT_HOVER,
@@ -2712,14 +2712,14 @@ class OmniImageStudioApp(ctk.CTk):
         top_bar.grid_propagate(False)
 
         ctk.CTkLabel(
-            top_bar, text="🪄  Studio Xóa Vật Thể & Logo (Magic Inpainting)",
+            top_bar, text="✂️  Studio Cắt & Loại Bỏ Logo Hiện (Watermark Cropper)",
             font=ctk.CTkFont("Segoe UI", 14, "bold"),
             text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D)
         ).pack(side="left", padx=16)
 
         ctk.CTkLabel(
             top_bar,
-            text="💡 Dùng cọ hoặc khung khoanh lên vật thể/logo cần xóa. Thuật toán Telea FMM sẽ tái tạo bề mặt tự nhiên.",
+            text="💡 Dùng cọ hoặc khung khoanh lên logo, hoặc chọn nhanh các góc để cắt xén viền sạch sẽ 100% sắc nét (không làm mờ).",
             font=ctk.CTkFont("Segoe UI", 11),
             text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
         ).pack(side="left", padx=8)
@@ -3106,7 +3106,7 @@ class OmniImageStudioApp(ctk.CTk):
             if not np.any(np.array(state["mask"]) > 0):
                 messagebox.showwarning(
                     "Chưa Chọn Vùng Logo",
-                    "Vui lòng quét chọn hoặc khoanh vùng logo ở mép ảnh cần cắt bỏ!"
+                    "Vui lòng quét chọn hoặc chọn nhanh góc chứa logo ở mép ảnh cần cắt bỏ!"
                 )
                 return
 
@@ -3117,10 +3117,27 @@ class OmniImageStudioApp(ctk.CTk):
             try:
                 state["last_applied_mask"] = state["mask"].copy()
                 state["last_op"] = "crop"
+
+                edge_str = opt_edge.get()
+                chosen_edge = None
+                if "Đáy" in edge_str:
+                    chosen_edge = "bottom"
+                elif "Phải" in edge_str and "Góc" not in edge_str:
+                    chosen_edge = "right"
+                elif "Trên" in edge_str:
+                    chosen_edge = "top"
+                elif "Trái" in edge_str and "Góc" not in edge_str:
+                    chosen_edge = "left"
+                elif "Dưới Phải" in edge_str:
+                    chosen_edge = "corner_br"
+                elif "Dưới Trái" in edge_str:
+                    chosen_edge = "corner_bl"
+
                 cropped = NativeImageEngine.crop_watermark_edge(
                     state["working_img"],
                     state["mask"],
-                    padding=1
+                    padding=1,
+                    edge=chosen_edge
                 )
 
                 ms = int((time.time() - t0) * 1000)
@@ -3132,7 +3149,7 @@ class OmniImageStudioApp(ctk.CTk):
                 render_canvas()
                 btn_compare.configure(state="normal")
                 lbl_status.configure(
-                    text=f"✂️ Đã cắt viền logo thành công: {cropped.width}×{cropped.height} px ({ms}ms)!",
+                    text=f"✂️ Đã cắt bỏ logo thành công: {cropped.width}×{cropped.height} px ({ms}ms)!",
                     text_color=SUCCESS
                 )
             except Exception as ex:
@@ -3171,44 +3188,73 @@ class OmniImageStudioApp(ctk.CTk):
             except Exception as ex:
                 lbl_status.configure(text=f"Lỗi khi xóa trong suốt: {ex}", text_color=DANGER)
 
-        btn_clean_fill = ctk.CTkButton(
-            card_exec,
-            text="⚡   XÓA SẠCH (LẤP ĐẦY NỀN)",
-            height=38, corner_radius=8,
-            font=ctk.CTkFont("Segoe UI", 12, "bold"),
-            fg_color=WARNING, hover_color=WARNING_HOVER,
-            text_color="white",
-            command=execute_clean_fill
-        )
-        btn_clean_fill.grid(row=1, column=0, padx=8, pady=(4, 4), sticky="ew")
+        # Direction selector frame
+        edge_hdr = ctk.CTkFrame(card_exec, fg_color="transparent")
+        edge_hdr.grid(row=1, column=0, padx=8, pady=(2, 0), sticky="ew")
+        edge_hdr.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            edge_hdr, text="Hướng cắt viền:",
+            font=ctk.CTkFont("Segoe UI", 10, "bold"),
+            text_color=(TEXT_MUTED_L, TEXT_MUTED_D)
+        ).grid(row=0, column=0, sticky="w")
 
-        row_extra_ops = ctk.CTkFrame(card_exec, fg_color="transparent")
-        row_extra_ops.grid(row=2, column=0, padx=8, pady=(0, 4), sticky="ew")
-        row_extra_ops.grid_columnconfigure((0, 1), weight=1)
+        opt_edge = ctk.CTkOptionMenu(
+            card_exec,
+            values=[
+                "⚡ Tự Động Xác Định (Auto)",
+                "━ Cắt Dải Đáy (Bottom Strip)",
+                "▏ Cắt Mép Phải (Right Edge)",
+                "━ Cắt Dải Trên (Top Strip)",
+                "▕ Cắt Mép Trái (Left Edge)",
+                "📐 Cắt Góc Dưới Phải (Corner BR)",
+                "📐 Cắt Góc Dưới Trái (Corner BL)"
+            ],
+            font=ctk.CTkFont("Segoe UI", 11),
+            fg_color=(BG_SUB_LIGHT, BG_SUB_DARK),
+            button_color=ACCENT, button_hover_color=ACCENT_HOVER
+        )
+        opt_edge.set("⚡ Tự Động Xác Định (Auto)")
+        opt_edge.grid(row=2, column=0, padx=8, pady=(2, 6), sticky="ew")
 
         btn_crop = ctk.CTkButton(
-            row_extra_ops,
-            text="✂️   Cắt Bỏ Viền",
-            height=32, corner_radius=6,
-            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            card_exec,
+            text="✂️   CẮT BỎ VIỀN LOGO (CROP)",
+            height=42, corner_radius=8,
+            font=ctk.CTkFont("Segoe UI", 13, "bold"),
             fg_color=("#4F46E5", "#4338CA"),
             hover_color=("#4338CA", "#3730A3"),
             text_color="white",
             command=execute_crop
         )
-        btn_crop.grid(row=0, column=0, padx=(0, 3), sticky="ew")
+        btn_crop.grid(row=3, column=0, padx=8, pady=(4, 4), sticky="ew")
+
+        row_extra_ops = ctk.CTkFrame(card_exec, fg_color="transparent")
+        row_extra_ops.grid(row=4, column=0, padx=8, pady=(0, 4), sticky="ew")
+        row_extra_ops.grid_columnconfigure((0, 1), weight=1)
 
         btn_trans = ctk.CTkButton(
             row_extra_ops,
-            text="🔲   Trong Suốt",
-            height=32, corner_radius=6,
+            text="🔲  Xóa Trong Suốt",
+            height=30, corner_radius=6,
             font=ctk.CTkFont("Segoe UI", 11, "bold"),
             fg_color=(BG_SUB_LIGHT, BG_SUB_DARK),
             hover_color=(BORDER_LIGHT, BORDER_DARK),
             text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
             command=execute_transparent
         )
-        btn_trans.grid(row=0, column=1, padx=(3, 0), sticky="ew")
+        btn_trans.grid(row=0, column=0, padx=(0, 3), sticky="ew")
+
+        btn_clean_fill = ctk.CTkButton(
+            row_extra_ops,
+            text="🎨  Lấp Đầy Nền",
+            height=30, corner_radius=6,
+            font=ctk.CTkFont("Segoe UI", 11),
+            fg_color=(BG_SUB_LIGHT, BG_SUB_DARK),
+            hover_color=(BORDER_LIGHT, BORDER_DARK),
+            text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
+            command=execute_clean_fill
+        )
+        btn_clean_fill.grid(row=0, column=1, padx=(3, 0), sticky="ew")
 
         # Compare Before/After Button
         def on_compare_press(e):
@@ -3230,7 +3276,7 @@ class OmniImageStudioApp(ctk.CTk):
             text_color=(TEXT_PRIMARY_L, TEXT_PRIMARY_D),
             state="disabled"
         )
-        btn_compare.grid(row=3, column=0, padx=8, pady=(0, 8), sticky="ew")
+        btn_compare.grid(row=5, column=0, padx=8, pady=(0, 8), sticky="ew")
         btn_compare.bind("<ButtonPress-1>", on_compare_press)
         btn_compare.bind("<ButtonRelease-1>", on_compare_release)
 
@@ -3275,8 +3321,23 @@ class OmniImageStudioApp(ctk.CTk):
                 messagebox.showwarning("Thông Báo", "Vui lòng chọn vùng logo cần xử lý trước khi áp dụng cho tất cả ảnh!")
                 return
 
-            op_type = state.get("last_op", "clean_fill")
+            op_type = state.get("last_op", "crop")
             op_label = "cắt bỏ viền" if op_type == "crop" else ("xóa trong suốt" if op_type == "transparent" else "xóa sạch")
+
+            edge_str = opt_edge.get()
+            batch_edge = None
+            if "Đáy" in edge_str:
+                batch_edge = "bottom"
+            elif "Phải" in edge_str and "Góc" not in edge_str:
+                batch_edge = "right"
+            elif "Trên" in edge_str:
+                batch_edge = "top"
+            elif "Trái" in edge_str and "Góc" not in edge_str:
+                batch_edge = "left"
+            elif "Dưới Phải" in edge_str:
+                batch_edge = "corner_br"
+            elif "Dưới Trái" in edge_str:
+                batch_edge = "corner_bl"
 
             if not messagebox.askyesno(
                 "Xác Nhận Xử Lý Hàng Loạt",
@@ -3296,7 +3357,7 @@ class OmniImageStudioApp(ctk.CTk):
                         m_scaled = ref_mask.resize(img.size, Image.Resampling.NEAREST)
                     
                     if op_type == "crop":
-                        cleaned = NativeImageEngine.crop_watermark_edge(img, m_scaled, padding=1)
+                        cleaned = NativeImageEngine.crop_watermark_edge(img, m_scaled, padding=1, edge=batch_edge)
                     elif op_type == "transparent":
                         cleaned = NativeImageEngine.erase_watermark_transparent(
                             img, m_scaled, dilate_pixels=state.get("dilate", 2)

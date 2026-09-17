@@ -788,6 +788,14 @@ class NativeImageEngine:
         elif edge == "left":
             new_left = min(w - 10, max_x + pad)
             return image.crop((new_left, 0, w, h))
+        elif edge in ("corner_br", "bottom_right_corner"):
+            return image.crop((0, 0, max(10, min_x - pad), max(10, min_y - pad)))
+        elif edge in ("corner_bl", "bottom_left_corner"):
+            return image.crop((min(w - 10, max_x + pad), 0, w, max(10, min_y - pad)))
+        elif edge in ("corner_tr", "top_right_corner"):
+            return image.crop((0, min(h - 10, max_y + pad), max(10, min_x - pad), h))
+        elif edge in ("corner_tl", "top_left_corner"):
+            return image.crop((min(w - 10, max_x + pad), min(h - 10, max_y + pad), w, h))
             
         return image
 

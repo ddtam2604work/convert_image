@@ -91,6 +91,7 @@
       tool: 'brush', // 'brush', 'rect', 'eraser'
       brushSize: 24,
       dilate: 2,
+      cropEdge: 'auto',
       isDrawing: false,
       lastX: null,
       lastY: null,
@@ -99,7 +100,8 @@
       history: [],
       originalSnapshot: null,
       currentCleanedSnapshot: null,
-      lastAppliedMask: null
+      lastAppliedMask: null,
+      lastOp: 'crop'
     },
 
     // Pan state
@@ -291,6 +293,7 @@
     btnInpaintClearMask: $('btnInpaintClearMask'),
     btnExecuteInpaint: $('btnExecuteInpaint'),
     btnExecuteCrop: $('btnExecuteCrop'),
+    btnCropAndApplyDirectly: $('btnCropAndApplyDirectly'),
     btnExecuteTransparent: $('btnExecuteTransparent'),
     btnInpaintApplyAll: $('btnInpaintApplyAll'),
     btnInpaintApplyAndClose: $('btnInpaintApplyAndClose'),
@@ -2417,6 +2420,29 @@
       });
     }
 
+    // Helper to switch active crop edge
+    const setCropEdge = (edge) => {
+      state.inpaint.cropEdge = edge;
+      const edgeBtns = document.querySelectorAll('.crop-edge-btn');
+      edgeBtns.forEach(b => {
+        if (b.dataset.edge === edge) {
+          b.className = 'px-2 py-1 rounded-lg text-[11px] font-medium bg-indigo-600 text-white cursor-pointer crop-edge-btn';
+        } else {
+          b.className = 'px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer crop-edge-btn';
+        }
+      });
+    };
+
+    // Wire Crop Edge Direction Buttons
+    const cropEdgeBtns = document.querySelectorAll('.crop-edge-btn');
+    cropEdgeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const edge = btn.dataset.edge || 'auto';
+        setCropEdge(edge);
+        showToast(`✂️ Đã chọn hướng mép cắt: ${btn.textContent.trim()}`, 'crop');
+      });
+    });
+
     // 1-Click Corner Presets
     const applyCornerPreset = (cornerKey) => {
       if (!el.inpaintMaskCanvas) return;
@@ -2437,20 +2463,25 @@
       if (cornerKey === 'bottom_right') {
         rx = Math.max(0, w - bw - margin);
         ry = Math.max(0, h - bh - margin);
+        setCropEdge('bottom');
       } else if (cornerKey === 'bottom_left') {
         rx = margin;
         ry = Math.max(0, h - bh - margin);
+        setCropEdge('bottom');
       } else if (cornerKey === 'top_right') {
         rx = Math.max(0, w - bw - margin);
         ry = margin;
+        setCropEdge('top');
       } else if (cornerKey === 'top_left') {
         rx = margin;
         ry = margin;
+        setCropEdge('top');
       } else if (cornerKey === 'bottom_bar') {
         rx = margin;
         ry = Math.max(0, h - bh - margin);
         rw = Math.max(20, w - margin * 2);
         rh = bh;
+        setCropEdge('bottom');
       }
 
       ctx.globalCompositeOperation = 'source-over';
@@ -2793,24 +2824,38 @@
       const fx2 = Math.ceil(box.maxX * scaleX);
       const fy2 = Math.ceil(box.maxY * scaleY);
 
-      const distBottom = fullH - fy2;
-      const distTop = fy1;
-      const distRight = fullW - fx2;
-      const distLeft = fx1;
-
+      const edge = state.inpaint.cropEdge || 'auto';
       let cropX = 0, cropY = 0, cropW = fullW, cropH = fullH;
-      if (fy1 >= fullH * 0.65 || distBottom <= Math.min(distTop, distLeft, distRight)) {
+
+      if (edge === 'bottom') {
         cropH = Math.max(10, fy1 - 2);
-      } else if (fy2 <= fullH * 0.35 || distTop <= Math.min(distBottom, distLeft, distRight)) {
+      } else if (edge === 'top') {
         cropY = Math.min(fullH - 10, fy2 + 2);
         cropH = fullH - cropY;
-      } else if (fx1 >= fullW * 0.65 || distRight <= Math.min(distBottom, distTop, distLeft)) {
+      } else if (edge === 'right') {
         cropW = Math.max(10, fx1 - 2);
-      } else if (fx2 <= fullW * 0.35 || distLeft <= Math.min(distBottom, distTop, distRight)) {
+      } else if (edge === 'left') {
         cropX = Math.min(fullW - 10, fx2 + 2);
         cropW = fullW - cropX;
       } else {
-        cropH = Math.max(10, fy1 - 2);
+        const distBottom = fullH - fy2;
+        const distTop = fy1;
+        const distRight = fullW - fx2;
+        const distLeft = fx1;
+
+        if (fy1 >= fullH * 0.65 || distBottom <= Math.min(distTop, distLeft, distRight)) {
+          cropH = Math.max(10, fy1 - 2);
+        } else if (fy2 <= fullH * 0.35 || distTop <= Math.min(distBottom, distLeft, distRight)) {
+          cropY = Math.min(fullH - 10, fy2 + 2);
+          cropH = fullH - cropY;
+        } else if (fx1 >= fullW * 0.65 || distRight <= Math.min(distBottom, distTop, distLeft)) {
+          cropW = Math.max(10, fx1 - 2);
+        } else if (fx2 <= fullW * 0.35 || distLeft <= Math.min(distBottom, distTop, distRight)) {
+          cropX = Math.min(fullW - 10, fx2 + 2);
+          cropW = fullW - cropX;
+        } else {
+          cropH = Math.max(10, fy1 - 2);
+        }
       }
 
       const cropCanvas = document.createElement('canvas');
@@ -2950,7 +2995,11 @@
         const mCanvas = el.inpaintMaskCanvas;
         const bctx = bCanvas.getContext('2d');
 
-        const box = getWatermarkBoundingBox(mCanvas);
+        let box = getWatermarkBoundingBox(mCanvas);
+        if (!box) {
+          applyCornerPreset('bottom_bar');
+          box = getWatermarkBoundingBox(mCanvas);
+        }
         if (!box) {
           showToast('Vui lòng quét cọ hoặc chọn vị trí logo cần cắt bỏ viền!', 'crop');
           return;
@@ -2962,24 +3011,38 @@
         state.inpaint.lastAppliedMaskCanvas = copyMaskCanvas;
         state.inpaint.lastOp = 'crop';
 
-        const distBottom = bCanvas.height - box.maxY;
-        const distTop = box.minY;
-        const distRight = bCanvas.width - box.maxX;
-        const distLeft = box.minX;
-
+        const edge = state.inpaint.cropEdge || 'auto';
         let cx = 0, cy = 0, cw = bCanvas.width, ch = bCanvas.height;
-        if (box.minY >= bCanvas.height * 0.65 || distBottom <= Math.min(distTop, distLeft, distRight)) {
+
+        if (edge === 'bottom') {
           ch = Math.max(10, box.minY - 2);
-        } else if (box.maxY <= bCanvas.height * 0.35 || distTop <= Math.min(distBottom, distLeft, distRight)) {
+        } else if (edge === 'top') {
           cy = Math.min(bCanvas.height - 10, box.maxY + 2);
           ch = bCanvas.height - cy;
-        } else if (box.minX >= bCanvas.width * 0.65 || distRight <= Math.min(distBottom, distTop, distLeft)) {
+        } else if (edge === 'right') {
           cw = Math.max(10, box.minX - 2);
-        } else if (box.maxX <= bCanvas.width * 0.35 || distLeft <= Math.min(distBottom, distTop, distRight)) {
+        } else if (edge === 'left') {
           cx = Math.min(bCanvas.width - 10, box.maxX + 2);
           cw = bCanvas.width - cx;
         } else {
-          ch = Math.max(10, box.minY - 2);
+          const distBottom = bCanvas.height - box.maxY;
+          const distTop = box.minY;
+          const distRight = bCanvas.width - box.maxX;
+          const distLeft = box.minX;
+
+          if (box.minY >= bCanvas.height * 0.65 || distBottom <= Math.min(distTop, distLeft, distRight)) {
+            ch = Math.max(10, box.minY - 2);
+          } else if (box.maxY <= bCanvas.height * 0.35 || distTop <= Math.min(distBottom, distLeft, distRight)) {
+            cy = Math.min(bCanvas.height - 10, box.maxY + 2);
+            ch = bCanvas.height - cy;
+          } else if (box.minX >= bCanvas.width * 0.65 || distRight <= Math.min(distBottom, distTop, distLeft)) {
+            cw = Math.max(10, box.minX - 2);
+          } else if (box.maxX <= bCanvas.width * 0.35 || distLeft <= Math.min(distBottom, distTop, distRight)) {
+            cx = Math.min(bCanvas.width - 10, box.maxX + 2);
+            cw = bCanvas.width - cx;
+          } else {
+            ch = Math.max(10, box.minY - 2);
+          }
         }
 
         const croppedPreview = document.createElement('canvas');
@@ -2995,6 +3058,49 @@
         state.inpaint.currentCleanedSnapshot = bctx.getImageData(0, 0, cw, ch);
 
         showToast(`✂️ Đã cắt bỏ viền logo (${cw}×${ch} px)! Bấm "Lưu vào Canvas" để áp dụng`, 'crop');
+      });
+    }
+
+    // Direct 1-Click Crop & Apply to Canvas
+    if (el.btnCropAndApplyDirectly) {
+      el.btnCropAndApplyDirectly.addEventListener('click', () => {
+        if (state.activeIndex < 0 || !state.files[state.activeIndex]) {
+          showToast('Vui lòng mở ảnh trước khi cắt!', 'warning');
+          return;
+        }
+        const item = state.files[state.activeIndex];
+        const mCanvas = el.inpaintMaskCanvas;
+        let box = getWatermarkBoundingBox(mCanvas);
+        if (!box) {
+          applyCornerPreset('bottom_bar');
+          box = getWatermarkBoundingBox(mCanvas);
+        }
+        if (!box) {
+          showToast('Vui lòng quét cọ hoặc chọn vị trí logo cần cắt!', 'crop');
+          return;
+        }
+
+        state.inpaint.lastAppliedMaskCanvas = mCanvas;
+        state.inpaint.lastOp = 'crop';
+
+        const fullCanvas = cropOutWatermarkFromItem(item, mCanvas);
+        if (!fullCanvas) {
+          showToast('Không thể cắt bỏ viền logo!', 'error');
+          return;
+        }
+
+        const newImg = new Image();
+        newImg.onload = () => {
+          item.img = newImg;
+          item.origW = fullCanvas.width;
+          item.origH = fullCanvas.height;
+          renderArtwork();
+          updateHistogram();
+          recordHistory('Cắt bỏ viền logo (Crop)');
+          closeModal('modalInpaint');
+          showToast(`✂️ Đã cắt bỏ viền logo và lưu vào Canvas (${item.origW}×${item.origH} px)!`, 'check_circle');
+        };
+        newImg.src = fullCanvas.toDataURL('image/png');
       });
     }
 
@@ -3536,6 +3642,16 @@
       state.inpaint.originalSnapshot = bctx.getImageData(0, 0, displayW, displayH);
       state.inpaint.currentCleanedSnapshot = null;
       state.inpaint.lastAppliedMaskCanvas = null;
+      state.inpaint.lastOp = 'crop';
+      state.inpaint.cropEdge = 'auto';
+      const edgeBtns = document.querySelectorAll('.crop-edge-btn');
+      edgeBtns.forEach(b => {
+        if (b.dataset.edge === 'auto') {
+          b.className = 'px-2 py-1 rounded-lg text-[11px] font-medium bg-indigo-600 text-white cursor-pointer crop-edge-btn';
+        } else {
+          b.className = 'px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer crop-edge-btn';
+        }
+      });
     }
   }
 

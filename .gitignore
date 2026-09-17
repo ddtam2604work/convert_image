@@ -9,7 +9,6 @@ dist/
 *.spec
 
 # IDE & OS
-.vscode/
 .idea/
 Thumbs.db
 Desktop.ini
@@ -18,3 +17,5 @@ Desktop.ini
 # Temporary files
 scratch/
 *.log
+config.bat
+node_modules
